@@ -9,7 +9,7 @@ Group repository for predicting home credit default risk, part 2 of the Capstone
 
 A collaboration between [Georgia Christodoulou](https://github.com/g-christodoulou) and [Adam Bushman](https://github.com/adambushman). This is a featured group project for Capstone #2 (IS 6812) for the Eccles Business School Masters of Science Business Analytics graduate program.
 
-The project features analytical workflows in data wrangling, data analysis, and data science, leveraged for the purpose of improving the business operations and capabilities.
+The project features analytical workflows in data wrangling, data analysis, and data science, leveraged for the purpose of improving the business operations and capabilities. Review our work via in [rendered notebooks](https://adambushman.github.io/home-credit-default-risk-group/).
 
 
 ## Capstone 2 Project
