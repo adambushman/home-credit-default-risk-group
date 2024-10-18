@@ -1,0 +1,75 @@
+---
+title: "Data Cleaning"
+author: "Georgia Christodoulou"
+date: "2024-10-17"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(dbplyr)
+
+
+application_train <- read.csv("data/application_train.csv")
+application_test <- read.csv("data/application_test.csv")
+
+application_train %>% summary()
+
+```
+
+
+```{r}
+application_cleaning <- function(data) {
+  # remove entire columns
+  data <- data[, !grepl("DOCUMENT|AVG|MODE|MEDI", names(data))]
+
+  # impute NA with 0 for specific columns
+  NA_0 <- grep("SOCIAL|BUREAU", names(data), value = TRUE)
+  for (col in NA_0) {
+    data[is.na(data[[col]]), col] <- 0
+  }
+
+  # impute blanks with NA
+  data[data == ""] <- NA
+
+  # impute NAME_TYPE_SUITE with "Unaccompanied"
+  data$NAME_TYPE_SUITE[is.na(data$NAME_TYPE_SUITE)] <- "Unaccompanied"
+
+  # impute OCCUPATION_TYPE with XNA
+  data$OCCUPATION_TYPE[is.na(data$OCCUPATION_TYPE)] <- "XNA"
+
+  # convert all character columns to factors
+  data[sapply(data, is.character)] <- lapply(data[sapply(data, is.character)], factor)
+
+  # remove rows where FLAG_OWN_CAR = "Y" and OWN_CAR_AGE is NA
+  data <- data[!(data$FLAG_OWN_CAR == "Y" & is.na(data$OWN_CAR_AGE)), ]
+
+  # add 1 year to all non-NA values of OWN_CAR_AGE
+  data$OWN_CAR_AGE <- ifelse(!is.na(data$OWN_CAR_AGE), data$OWN_CAR_AGE + 1, data$OWN_CAR_AGE)
+
+  # replace remaining NAs in OWN_CAR_AGE with 0
+  data$OWN_CAR_AGE[is.na(data$OWN_CAR_AGE)] <- 0
+
+  # replace NAs in EXT columns with the mean of the column
+  ext_NA <- grep("EXT", names(data), value = TRUE)
+  for (col in ext_NA) {
+    data[[col]][is.na(data[[col]])] <- mean(data[[col]], na.rm = TRUE)
+  }
+
+  # remove rows with any remaining NA values
+  data <- na.omit(data)
+
+  return(data)
+}
+
+application_train_clean <- application_cleaning(application_train)
+
+application_test_clean <- application_cleaning(application_test)
+
+application_train_clean %>% summary()
+```
+
