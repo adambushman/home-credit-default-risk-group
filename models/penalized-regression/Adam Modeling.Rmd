@@ -77,3 +77,31 @@ coef_df |>
     arrange(desc(abs(Coefficient)))
 ```
 
+## Tuned Modeling
+
+
+
+## Interaction terms
+
+We're going to create some interaction terms, something to indicate a varying relationship between predictors.
+
+We'll implement the following interactions, largely informed by data analysis work:
+
+1.  `OCCUPATION_TYPE` and `AMT_INCOME_TOTAL`
+4.  `NAME_EDUCATION_TYPE` and `
+2.  `ORGANIZATION_TYPE` and `AMT_INCOME_TOTAL`
+3.  `AMT_CREDIT` and `AMT_GOODS_PRICE`
+
+```{r}
+alt_data <-
+    data |>
+    mutate(
+
+    )
+```
+
+```{r}
+predictors_alt <- as.matrix(
+    data[,-which(names(data) == "DEFAULT")]
+)
+```
