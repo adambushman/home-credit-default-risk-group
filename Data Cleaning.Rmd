@@ -12,12 +12,13 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```{r}
 library(tidyverse)
 library(dbplyr)
+library(data.table)
 
-
-application_train <- read.csv("data/application_train.csv")
-application_test <- read.csv("data/application_test.csv")
+application_train <- as.data.frame(fread("data/application_train.csv"))
+application_test <- as.data.frame(fread("data/application_test.csv"))
 
 application_train %>% summary()
+application_train %>% str()
 
 ```
 
@@ -33,6 +34,31 @@ application_cleaning <- function(data) {
     data[is.na(data[[col]]), col] <- 0
   }
 
+  # remove XNA rows from CODE_GENDER
+  data <- data[data$CODE_GENDER != "XNA", ]
+  
+  # convert numeric variables with 2 unique values to boolean
+  for (col in names(data)) {
+    if (is.numeric(data[[col]]) && length(unique(data[[col]])) == 2) {
+      data[[col]] <- as.logical(data[[col]])
+    }
+  }
+  
+  # convert character variables with 2 unique values to boolean
+  data$NAME_CONTRACT_TYPE <- data$NAME_CONTRACT_TYPE == "Cash loans"
+  data$CODE_GENDER <- data$CODE_GENDER == "M"
+  data$FLAG_OWN_CAR <- data$FLAG_OWN_CAR == "Y"
+  data$FLAG_OWN_REALTY <- data$FLAG_OWN_REALTY == "Y"
+  
+  # change "TARGET" to "DEFAULT"
+  colnames(data)[colnames(data) == "TARGET"] <- "DEFAULT"
+  
+  # change "CODE_GENDER" to "GENDER_MALE"
+  colnames(data)[colnames(data) == "CODE_GENDER"] <- "GENDER_MALE"
+  
+  # change "NAME_CONTRACT_TYPE" to "CASH_LOAN"
+  colnames(data)[colnames(data) == "NAME_CONTRACT_TYPE"] <- "CASH_LOAN"
+  
   # impute blanks with NA
   data[data == ""] <- NA
 
@@ -54,11 +80,21 @@ application_cleaning <- function(data) {
   # replace remaining NAs in OWN_CAR_AGE with 0
   data$OWN_CAR_AGE[is.na(data$OWN_CAR_AGE)] <- 0
 
-  # replace NAs in EXT columns with the mean of the column
-  ext_NA <- grep("EXT", names(data), value = TRUE)
-  for (col in ext_NA) {
-    data[[col]][is.na(data[[col]])] <- mean(data[[col]], na.rm = TRUE)
-  }
+  # replace NAs in EXT columns with the mean or median of the column
+  # take mean of source 1 and median of source 2 and 3
+  ext1_mean <- mean(data$EXT_SOURCE_1, na.rm = TRUE)
+  ext2_med <- median(data$EXT_SOURCE_2, na.rm = TRUE)
+  ext3_med <- median(data$EXT_SOURCE_3, na.rm = TRUE)
+  
+  # add columns to indicate imputed or not
+  data$IMPUTED_EXT1 <- is.na(data$EXT_SOURCE_1)
+  data$IMPUTED_EXT2 <- is.na(data$EXT_SOURCE_2)
+  data$IMPUTED_EXT3 <- is.na(data$EXT_SOURCE_3)
+  
+  # replace NAs
+  data$EXT_SOURCE_1[is.na(data$EXT_SOURCE_1)] <- ext1_mean
+  data$EXT_SOURCE_2[is.na(data$EXT_SOURCE_2)] <- ext2_med
+  data$EXT_SOURCE_3[is.na(data$EXT_SOURCE_3)] <- ext3_med
 
   # remove rows with any remaining NA values
   data <- na.omit(data)
@@ -70,6 +106,19 @@ application_train_clean <- application_cleaning(application_train)
 
 application_test_clean <- application_cleaning(application_test)
 
+fwrite(
+  application_train_clean, 
+  file = "data/application_train_clean.csv", 
+  row.names = FALSE
+)
+
+fwrite(
+  application_test_clean, 
+  file = "data/application_test_clean.csv", 
+  row.names = FALSE
+)
+
 application_train_clean %>% summary()
+application_train_clean %>% str()
 ```
 
