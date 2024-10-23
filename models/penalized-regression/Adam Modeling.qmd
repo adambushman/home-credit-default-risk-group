@@ -16,6 +16,7 @@ execute:
 I'm focusing on modeling for `DEFAULT` using the below method(s): 
 
 1.  Penalized Regression
+2.  Support Vector Classifier
 
 
 ## Prep
@@ -25,6 +26,8 @@ Let's load a few libraries:
 ```{r}
 library('tidyverse')
 library('glmnet')
+library('e1071')
+library('caret')
 ```
 
 We'll load the cleaned, training data:
@@ -220,18 +223,66 @@ It looks as if the following were helpful predictors (though AUC was not improve
 
 ## Conclusion
 
-There's too many unique relationships to explore for an optimal model in the OLS family, even with the penalized regression flavor. We're likely tapped-out with an AUC of **~0.73**.
+There's too many unique relationships to explore for an optimal model in the OLS family, even with the penalized regression flavor. We're likely tapped-out with an AUC of **~0.71**.
 
 
-# Support Vector Machine
+# Support Vector Classifier
 
 ## Prep
 
-A suport vector machine could be a good approach due to many features, capturing some non-linear relationships, and robustness to overfitting. It's also pretty ideal for our binary classification use-case.
+A suport vector machine could be a good approach due to the nature of the problem and data:
+
+*   Many features
+*   Capturing some non-linear relationships
+*   Robustness to overfitting 
+*   Binary classification
+
+Lets get the data ready:
+
+```{r}
+# 3% sample of the data
+data_sampl <- sample_n(
+    data, 
+    ceiling(nrow(data) * 0.03)
+) |>
+    mutate(
+        across(where(is.character), ~make.names(.)), 
+        across(where(is.logical), ~factor(ifelse(.,"Y","N")))
+    ) |>
+    select(-c(SK_ID_CURR, FLAG_MOBIL))
+```
+
+```{r}
+fitControl <- trainControl(
+    method = "repeatedcv", 
+    number = 5, 
+    repeats = 2, 
+    classProbs = TRUE, 
+    summaryFunction = twoClassSummary, 
+    savePredictions = TRUE
+)
+
+fitGrid <- expand.grid(
+    sigma = c(0.01, 0.05), 
+    C = c(0.01, 0.5, 1, 5, 10)
+)
+```
 
 
 ## Basic Modeling
 
+```{r}
+mod03 <- train(
+    DEFAULT ~ ., 
+    data = data_sampl, 
+    method = "svmRadial", 
+    trControl = fitControl, 
+    metric = "ROC",  # Use ROC for AUC
+    tuneGrid = fitGrid
+)
+
+mod03
+```
 
 ## Tuned Modeling
 

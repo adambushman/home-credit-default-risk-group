@@ -3121,13 +3121,16 @@ vertical-align: -.125em;
 <p>I’m focusing on modeling for <code>DEFAULT</code> using the below method(s):</p>
 <ol type="1">
 <li>Penalized Regression</li>
+<li>Support Vector Classifier</li>
 </ol>
 <section id="prep" class="level2">
 <h2 class="anchored" data-anchor-id="prep">Prep</h2>
 <p>Let’s load a few libraries:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;tidyverse&#39;</span>)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;glmnet&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;glmnet&#39;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;e1071&#39;</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;caret&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We’ll load the cleaned, training data:</p>
 <div class="cell">
@@ -3520,17 +3523,233 @@ min 0.000178    67  0.7217 0.005335      35
 </section>
 <section id="conclusion" class="level2">
 <h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
-<p>There’s too many unique relationships to explore for an optimal model in the OLS family, even with the penalized regression flavor. We’re likely tapped-out with an AUC of <strong>~0.73</strong>.</p>
+<p>There’s too many unique relationships to explore for an optimal model in the OLS family, even with the penalized regression flavor. We’re likely tapped-out with an AUC of <strong>~0.71</strong>.</p>
 </section>
 </section>
-<section id="support-vector-machine" class="level1">
-<h1>Support Vector Machine</h1>
+<section id="support-vector-classifier" class="level1">
+<h1>Support Vector Classifier</h1>
 <section id="prep-2" class="level2">
 <h2 class="anchored" data-anchor-id="prep-2">Prep</h2>
-<p>A suport vector machine could be a good approach due to many features, capturing some non-linear relationships, and robustness to overfitting. It’s also pretty ideal for our binary classification use-case.</p>
+<p>A suport vector machine could be a good approach due to the nature of the problem and data:</p>
+<ul>
+<li>Many features</li>
+<li>Capturing some non-linear relationships</li>
+<li>Robustness to overfitting</li>
+<li>Binary classification</li>
+</ul>
+<p>Lets get the data ready:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 3% sample of the data</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>data_sampl <span class="ot">&lt;-</span> <span class="fu">sample_n</span>(</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    data, </span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ceiling</span>(<span class="fu">nrow</span>(data) <span class="sc">*</span> <span class="fl">0.03</span>)</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">across</span>(<span class="fu">where</span>(is.character), <span class="sc">~</span><span class="fu">make.names</span>(.)), </span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>        <span class="fu">across</span>(<span class="fu">where</span>(is.logical), <span class="sc">~</span><span class="fu">factor</span>(<span class="fu">ifelse</span>(.,<span class="st">&quot;Y&quot;</span>,<span class="st">&quot;N&quot;</span>)))</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">|&gt;</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(SK_ID_CURR, FLAG_MOBIL))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>fitControl <span class="ot">&lt;-</span> <span class="fu">trainControl</span>(</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;repeatedcv&quot;</span>, </span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">number =</span> <span class="dv">5</span>, </span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">repeats =</span> <span class="dv">2</span>, </span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">classProbs =</span> <span class="cn">TRUE</span>, </span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">summaryFunction =</span> twoClassSummary, </span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">savePredictions =</span> <span class="cn">TRUE</span></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>fitGrid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">sigma =</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.05</span>), </span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">C =</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.5</span>, <span class="dv">1</span>, <span class="dv">5</span>, <span class="dv">10</span>)</span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 </section>
 <section id="basic-modeling-1" class="level2">
 <h2 class="anchored" data-anchor-id="basic-modeling-1">Basic Modeling</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>mod03 <span class="ot">&lt;-</span> <span class="fu">train</span>(</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    DEFAULT <span class="sc">~</span> ., </span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> data_sampl, </span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;svmRadial&quot;</span>, </span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">trControl =</span> fitControl, </span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">metric =</span> <span class="st">&quot;ROC&quot;</span>,  <span class="co"># Use ROC for AUC</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">tuneGrid =</span> fitGrid</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb72"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a>mod03</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Support Vector Machines with Radial Basis Function Kernel 
+
+9217 samples
+  55 predictor
+   2 classes: &#39;N&#39;, &#39;Y&#39; 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold, repeated 2 times) 
+Summary of sample sizes: 7374, 7374, 7373, 7374, 7373, 7373, ... 
+Resampling results across tuning parameters:
+
+  sigma  C      ROC        Sens       Spec        
+  0.01    0.01  0.5449341  1.0000000  0.0000000000
+  0.01    0.50  0.5461864  0.9998818  0.0000000000
+  0.01    1.00  0.5462024  0.9999409  0.0000000000
+  0.01    5.00  0.5449707  1.0000000  0.0000000000
+  0.01   10.00  0.5428708  1.0000000  0.0000000000
+  0.05    0.01  0.5475613  0.9997635  0.0006578947
+  0.05    0.50  0.5499208  0.9998227  0.0006578947
+  0.05    1.00  0.5499730  0.9997635  0.0006578947
+  0.05    5.00  0.5484574  0.9998818  0.0000000000
+  0.05   10.00  0.5485611  0.9999409  0.0000000000
+
+ROC was used to select the optimal model using the largest value.
+The final values used for the model were sigma = 0.05 and C = 1.</code></pre>
+</div>
+</div>
 </section>
 <section id="tuned-modeling-1" class="level2">
 <h2 class="anchored" data-anchor-id="tuned-modeling-1">Tuned Modeling</h2>
