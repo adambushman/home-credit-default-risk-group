@@ -1,0 +1,204 @@
+---
+title: "Random Forest"
+author: "Georgia Christodoulou"
+date: "2024-10-20"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+# Libraries and Data Import
+```{r}
+library(PRROC)
+library(caret)
+library(knitr)
+library(tidyverse)
+library(data.table)
+library(caret)
+library(ranger)
+library(matrixStats)
+library(Metrics)
+library(ROCR)
+library(pROC)
+
+application_train_clean <- as.data.frame(fread("data/application_train_clean.csv"))
+application_test_clean <- as.data.frame(fread("data/application_test_clean.csv"))
+ 
+str(application_train_clean)
+```
+
+# Class Balance
+```{r}
+application_train_clean %>% pull(DEFAULT) %>% table()
+application_train_clean %>% pull(DEFAULT) %>% table() %>% prop.table() %>% round(2)
+```
+# Data Partitioning
+```{r}
+# split data set
+creditinTrain <- createDataPartition(application_train_clean$DEFAULT, p=.7, list=FALSE)
+
+# train set
+credit_train_set <- application_train_clean[creditinTrain,]
+
+# test set
+credit_test_set <- application_train_clean[-creditinTrain,]
+```
+
+
+# Training the Random Forest
+```{r}
+# convert target column to factor
+credit_train_set$DEFAULT <- as.factor(credit_train_set$DEFAULT)
+credit_test_set$DEFAULT <- as.factor(credit_test_set$DEFAULT)
+
+# calculate class weights for unbalanced dataset
+class_proportions <- table(credit_train_set$DEFAULT) / nrow(credit_train_set)
+class_weights <- 1 / class_proportions
+
+# train RF model with 500 trees, 10 depth
+rf_model <- ranger(formula = DEFAULT ~ ., data = credit_train_set, 
+                   num.trees = 500, max.depth = 10, oob.error = TRUE, class.weights = class_weights, , importance = 'impurity', seed = 1234)
+
+# find and print important variables
+importance <- sort(rf_model$variable.importance, decreasing = TRUE)
+print(importance)
+```
+
+# Predictions on Train Data
+```{r}
+# predict classes on train data
+predictions_train <- predict(rf_model, credit_train_set)$predictions
+```
+
+## Train Metrics
+```{r}
+# get confusion matrix
+conf_matrix_train <- confusionMatrix(predictions_train, credit_train_set$DEFAULT)
+print(conf_matrix_train)
+```
+
+# Predictions on Test Data
+```{r}
+# predict on test data
+predictions_test <- predict(rf_model, credit_test_set)$predictions
+```
+
+## Test Metrics
+```{r}
+# get confusion matrix
+conf_matrix_test <- confusionMatrix(predictions_test, credit_test_set$DEFAULT)
+print(conf_matrix_test)
+```
+
+# AUC Train Set
+```{r}
+# train RF for AUC calculation
+rf_AUC <- ranger(formula = DEFAULT ~ ., data = credit_train_set, 
+                   num.trees = 500, max.depth = 10, oob.error = TRUE, probability = TRUE, class.weights = class_weights, importance = 'impurity', seed = 1234)
+
+# train probabilities
+probs_train <- predict(rf_AUC, data = credit_train_set)$predictions[, 2]
+
+# train predictions
+pred_train <- prediction(probs_train, credit_train_set$DEFAULT)
+
+# train trp and fpr performance metrics
+perf_train <- performance(pred_train, measure = "tpr", x.measure = "fpr")
+
+# train AUC performance
+auc_perf_train <- performance(pred_train, measure = "auc")
+
+# train AUC calculation
+auc_value_train <- auc_perf_train@y.values[[1]]
+
+# print AUC value
+print(paste("AUC =", round(auc_value_train, 4)))
+```
+# AUC Test Set
+```{r}
+# test test probabilities
+probs_test <- predict(rf_AUC, data = credit_test_set)$predictions[, 2]
+
+# test set predictions
+pred_test <- prediction(probs_test, credit_test_set$DEFAULT)
+
+# test set tpr and fpr performance
+perf_test <- performance(pred_test, measure = "tpr", x.measure = "fpr")
+
+# test set AUC performance
+auc_perf_test <- performance(pred_test, measure = "auc")
+
+# test set AUC calcualtion
+auc_value_test <- auc_perf_test@y.values[[1]]
+
+# print AUC value
+print(paste("AUC =", round(auc_value_test, 4)))
+```
+
+# Model 2
+```{r}
+# train RF with 800 trees and 20 depth
+rf_model1 <- ranger(formula = DEFAULT ~ ., data = credit_train_set, , importance = 'impurity',
+                   num.trees = 800, max.depth = 20, class.weights = class_weights, seed = 1234)
+
+# train predictions
+predictions_train1 <- predict(rf_model1, credit_train_set)$predictions
+
+# test predictions
+predictions_test1 <- predict(rf_model1, credit_test_set)$predictions
+
+# conf matrix train
+conf_matrix_train1 <- confusionMatrix(predictions_train1, credit_train_set$DEFAULT)
+print(conf_matrix_train1)
+
+# conf matrix train
+conf_matrix_test1 <- confusionMatrix(predictions_test1, credit_test_set$DEFAULT)
+print(conf_matrix_test1)
+```
+
+# AUC Train Set 2
+```{r}
+# train AUC for 800 trees, 20 depth
+rf_AUC1 <- ranger(formula = DEFAULT ~ ., data = credit_train_set, num.trees = 800, max.depth = 20, probability = TRUE, importance = 'impurity', class.weights = class_weights, seed = 1234)
+
+# probabilities
+probs_train1 <- predict(rf_AUC1, data = credit_train_set)$predictions[, 2]
+
+# predictions
+pred_train1 <- prediction(probs_train1, credit_train_set$DEFAULT)
+
+# tpr and fpr
+perf_train1 <- performance(pred_train1, measure = "tpr", x.measure = "fpr")
+
+# auc performance
+auc_perf_train1 <- performance(pred_train1, measure = "auc")
+
+# AUC calculation
+auc_value_train1 <- auc_perf_train1@y.values[[1]]
+
+# print AUC value
+print(paste("AUC =", round(auc_value_train1, 4)))
+```
+
+# AUC Test Set 2
+```{r}
+# probabilities
+probs_test1 <- predict(rf_AUC1, data = credit_test_set)$predictions[, 2]
+
+# predictions
+pred_test1 <- prediction(probs_test1, credit_test_set$DEFAULT)
+
+# tpr and fpr
+perf_test1 <- performance(pred_test1, measure = "tpr", x.measure = "fpr")
+
+# auc performance
+auc_perf_test1 <- performance(pred_test1, measure = "auc")
+
+# AUC calculation
+auc_value_test1 <- auc_perf_test1@y.values[[1]]
+
+# print AUC value
+print(paste("AUC =", round(auc_value_test1, 4)))
+```
