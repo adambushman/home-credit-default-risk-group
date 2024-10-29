@@ -9,19 +9,27 @@ output: html_document
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
+The purpose of this code is to process data necessary for modeling. This includes:
+
+1.  Cleaning (handling missing values, feature engineering, value standardization, etc.)
+2.  Class balancing
+
+We'll first load a few packages and the data:
+
 ```{r}
 library(tidyverse)
 library(dbplyr)
 library(data.table)
+library(caret)
+library(smotefamily)
 
 application_train <- as.data.frame(fread("data/application_train.csv"))
 application_test <- as.data.frame(fread("data/application_test.csv"))
 
-application_train %>% summary()
-application_train %>% str()
-
+glimpse(application_train)
 ```
 
+This function will perform the previously described cleaning.
 
 ```{r}
 application_cleaning <- function(data) {
@@ -101,11 +109,18 @@ application_cleaning <- function(data) {
 
   return(data)
 }
+```
 
+We'll now apply that to each data set, both train and test:
+
+```{r}
 application_train_clean <- application_cleaning(application_train)
-
 application_test_clean <- application_cleaning(application_test)
+```
 
+We'll write these files to the "data/" directory for easy reference during modeling.
+
+```{r}
 fwrite(
   application_train_clean, 
   file = "data/application_train_clean.csv", 
@@ -117,8 +132,68 @@ fwrite(
   file = "data/application_test_clean.csv", 
   row.names = FALSE
 )
-
-application_train_clean %>% summary()
-application_train_clean %>% str()
 ```
 
+The next function will create a data set of balanced classes using the **SMOTE** approach of Synthetic Minority Oversampling Technique.
+
+```{r}
+application_smote <- function(data) {
+  # CHECK FOR SINGLE VALUE COLUMNS
+  unique <- sapply(data, function(x) length(unique(x)))
+  remove_cols <- names(unique[unique == 1])
+
+  # FORMAT DATA
+  data_clean <- 
+      data |>
+      select(-all_of(remove_cols)) |> 
+      select(-SK_ID_CURR) |>
+      mutate(
+          DEFAULT = factor(DEFAULT), 
+          across(where(is.character) & -DEFAULT, ~factor(make.names(.))), 
+          across(where(is.logical), ~factor(ifelse(.,"Y","N")))
+      )
+
+  # CONFIRM IMBALANCE
+  print("---Old Balance---")
+  print(table(data_clean$DEFAULT) |> prop.table())
+
+  # ONE-HOT-ENCODE VARIABLES WITH {CARET}
+  dmy <- dummyVars("~ . -DEFAULT", data_clean)
+  data_dmy <- data.frame(predict(dmy, data_clean))
+
+  # APPLY SMOTE
+  smote_results <- SMOTE(
+      data_dmy, 
+      target = data_clean$DEFAULT
+  )
+
+  # EXTRACT SMOTE DATE
+  data_smote <- smote_results$data |>
+      mutate(DEFAULT = class) |>
+      select(-class)
+
+  # CONFIRM REBALANCE3
+  print("--- New Balance ---")
+  print(table(data_smote$DEFAULT) |> prop.table())
+
+  return(data_smote)
+}
+```
+
+Now, we'll apply this to only the training set:
+
+```{r}
+application_train_smote <- application_smote(application_train_clean)
+```
+
+We'll then write it to the "data/" directory:
+
+```{r}
+fwrite(
+  application_train_smote, 
+  file = "data/application_train_smote.csv", 
+  row.names = FALSE
+)
+```
+
+Now we have both a cleaned and balanced training data set for use in all of our modeling.
