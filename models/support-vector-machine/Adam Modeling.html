@@ -3133,7 +3133,8 @@ vertical-align: -.125em;
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;tidyverse&#39;</span>)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;e1071&#39;</span>)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;caret&#39;</span>)</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;pROC&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;pROC&#39;</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;rsample&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We’ll load the cleaned, balanced, training data:</p>
 <div class="cell">
@@ -3341,9 +3342,9 @@ $ DEFAULT                                           &lt;fct&gt; Y, Y, Y, Y, Y, Y
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>full_train <span class="ot">&lt;-</span> data[partition_idx,]</span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>full_test <span class="ot">&lt;-</span> data[<span class="sc">-</span>partition_idx,]</span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 1% sample of the data</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 2% sample of the data</span></span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>train_sampl <span class="ot">&lt;-</span> <span class="fu">sample_n</span>(</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    full_train, <span class="fu">ceiling</span>(<span class="fu">nrow</span>(full_train) <span class="sc">*</span> <span class="fl">0.01</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    full_train, <span class="fu">ceiling</span>(<span class="fu">nrow</span>(full_train) <span class="sc">*</span> <span class="fl">0.02</span>)</span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>test_sampl <span class="ot">&lt;-</span> <span class="fu">sample_n</span>(</span>
 <span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    full_test, <span class="fu">ceiling</span>(<span class="fu">nrow</span>(full_test) <span class="sc">*</span> <span class="fl">0.05</span>)</span>
@@ -3360,156 +3361,201 @@ $ DEFAULT                                           &lt;fct&gt; Y, Y, Y, Y, Y, Y
 </section>
 <section id="support-vector-machine" class="level2">
 <h2 class="anchored" data-anchor-id="support-vector-machine">Support Vector machine</h2>
-<p>We also want to setup our cross validation, which includes a hyperparameter tuning grid and a training control object:</p>
+<p>We also want to setup our cross validation requiring folds, a tuning grid, and a loop:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fitControl <span class="ot">&lt;-</span> <span class="fu">trainControl</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;repeatedcv&quot;</span>, </span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">number =</span> <span class="dv">5</span>, </span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">repeats =</span> <span class="dv">2</span>, </span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">classProbs =</span> <span class="cn">TRUE</span>, </span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">summaryFunction =</span> twoClassSummary, </span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">savePredictions =</span> <span class="cn">TRUE</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>fitGrid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">sigma =</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.05</span>), </span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">C =</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.5</span>, <span class="dv">1</span>, <span class="dv">5</span>, <span class="dv">10</span>)</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>train_folds <span class="ot">&lt;-</span> rsample<span class="sc">::</span><span class="fu">vfold_cv</span>(train_sampl)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>fitGrid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">sigma =</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.05</span>), </span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">C =</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.5</span>, <span class="dv">1</span>, <span class="dv">5</span>, <span class="dv">10</span>), </span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">AUC =</span> <span class="dv">0</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="basic-modeling" class="level2">
 <h2 class="anchored" data-anchor-id="basic-modeling">Basic Modeling</h2>
 <p>We can now setup a cross-validated training of <code>DEFAULT</code> with the SMOTE data:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>mod03 <span class="ot">&lt;-</span> <span class="fu">train</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    DEFAULT <span class="sc">~</span> ., </span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> train_sampl, </span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;svmRadial&quot;</span>, </span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">trControl =</span> fitControl, </span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">metric =</span> <span class="st">&quot;ROC&quot;</span>,  <span class="co"># Use ROC for AUC</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">tuneGrid =</span> fitGrid</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>mod03</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>runCvSVM <span class="ot">&lt;-</span> <span class="cf">function</span>(grid, folds) {</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(folds)) {</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Values for modeling</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>        fold <span class="ot">&lt;-</span> folds<span class="sc">$</span>splits[i][[<span class="dv">1</span>]]</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>        sigma <span class="ot">&lt;-</span> grid<span class="sc">$</span>sigma[i]</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        C <span class="ot">&lt;-</span> grid<span class="sc">$</span>C[i]</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Training</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>        train <span class="ot">&lt;-</span> <span class="fu">training</span>(fold)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>        unique <span class="ot">&lt;-</span> <span class="fu">sapply</span>(train, <span class="cf">function</span>(x) <span class="fu">length</span>(<span class="fu">unique</span>(x)))</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>        remove_cols <span class="ot">&lt;-</span> <span class="fu">names</span>(unique[unique <span class="sc">==</span> <span class="dv">1</span>])</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>        train <span class="ot">&lt;-</span> train <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="sc">-</span><span class="fu">all_of</span>(remove_cols))</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>        modl <span class="ot">&lt;-</span> e1071<span class="sc">::</span><span class="fu">svm</span>(DEFAULT <span class="sc">~</span> ., <span class="at">data =</span> train, <span class="at">sigma =</span> sigma, <span class="at">C =</span> C)</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Testing</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>        test <span class="ot">&lt;-</span> <span class="fu">testing</span>(fold) <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="sc">-</span><span class="fu">all_of</span>(remove_cols))</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>        pred <span class="ot">&lt;-</span> <span class="fu">predict</span>(modl, <span class="at">newdata =</span> test, <span class="at">type =</span> <span class="st">&#39;response&#39;</span>)</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Evaluation</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>        roc_obj <span class="ot">&lt;-</span> <span class="fu">roc</span>(<span class="fu">ifelse</span>(test<span class="sc">$</span>DEFAULT <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>), <span class="fu">ifelse</span>(pred <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>))</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>        auc <span class="ot">&lt;-</span> <span class="fu">auc</span>(roc_obj)</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Save measure</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>        grid<span class="sc">$</span>AUC[i] <span class="ot">=</span> auc</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>        <span class="fu">print</span>(<span class="fu">paste0</span>(<span class="st">&quot;AUC from fold &quot;</span>, i, <span class="st">&quot;:&quot;</span>))</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>        <span class="fu">print</span>(auc)</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(grid)</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">runCvSVM</span>(fitGrid, train_folds)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Support Vector Machines with Radial Basis Function Kernel 
-
-4443 samples
- 176 predictor
-   2 classes: &#39;N&#39;, &#39;Y&#39; 
-
-No pre-processing
-Resampling: Cross-Validated (5 fold, repeated 2 times) 
-Summary of sample sizes: 3555, 3555, 3554, 3554, 3554, 3554, ... 
-Resampling results across tuning parameters:
-
-  sigma  C      ROC        Sens       Spec     
-  0.01    0.01  0.5640714  0.8555222  0.2308046
-  0.01    0.50  0.6039717  0.9470651  0.2165517
-  0.01    1.00  0.6103583  0.9523568  0.2229885
-  0.01    5.00  0.6120920  0.9541194  0.2229885
-  0.01   10.00  0.6116969  0.9547816  0.2241379
-  0.05    0.01  0.5667583  0.9371367  0.1606897
-  0.05    0.50  0.5687012  0.9446354  0.1544828
-  0.05    1.00  0.5791648  0.9585334  0.1528736
-  0.05    5.00  0.5806713  0.9596362  0.1570115
-  0.05   10.00  0.5806637  0.9596372  0.1565517
-
-ROC was used to select the optimal model using the largest value.
-The final values used for the model were sigma = 0.01 and C = 5.</code></pre>
+<pre><code>[1] &quot;AUC from fold 1:&quot;
+Area under the curve: 0.8189</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] &quot;AUC from fold 2:&quot;
+Area under the curve: 0.837</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] &quot;AUC from fold 3:&quot;
+Area under the curve: 0.8375</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] &quot;AUC from fold 4:&quot;
+Area under the curve: 0.8222</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] &quot;AUC from fold 5:&quot;
+Area under the curve: 0.8365</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] &quot;AUC from fold 6:&quot;
+Area under the curve: 0.8246</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] &quot;AUC from fold 7:&quot;
+Area under the curve: 0.8206</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] &quot;AUC from fold 8:&quot;
+Area under the curve: 0.8539</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] &quot;AUC from fold 9:&quot;
+Area under the curve: 0.826</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] &quot;AUC from fold 10:&quot;
+Area under the curve: 0.823</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>results</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   sigma     C       AUC
+1   0.01  0.01 0.8189310
+2   0.05  0.01 0.8369932
+3   0.01  0.50 0.8375020
+4   0.05  0.50 0.8221758
+5   0.01  1.00 0.8365004
+6   0.05  1.00 0.8245600
+7   0.01  5.00 0.8205697
+8   0.05  5.00 0.8539352
+9   0.01 10.00 0.8259827
+10  0.05 10.00 0.8229776</code></pre>
 </div>
 </div>
-<p>The AUC values are pretty poor. At around 0.56, that’s not much better than a random guess or using the majority class.</p>
-<p>Let’s now generate full metrics from the best model we’ve got here. Fisrt, we’ll use the model details we found before:</p>
+<p>The AUC values are looking really great. At around 0.83, that’s even better than we were estimating with a balanced, penalized regression model.</p>
+<p>Let’s now generate full metrics from the best model we’ve got here: <code>sigma = 0.05</code> and <code>C = 5.00</code>:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>tuned_mod <span class="ot">&lt;-</span> e1071<span class="sc">::</span><span class="fu">svm</span>(DEFAULT <span class="sc">~</span> ., <span class="at">data =</span> train_sampl, <span class="at">sigma =</span> <span class="fl">0.01</span>, <span class="at">C =</span> <span class="fl">0.05</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>tuned_mod <span class="ot">&lt;-</span> e1071<span class="sc">::</span><span class="fu">svm</span>(DEFAULT <span class="sc">~</span> ., <span class="at">data =</span> train_sampl, <span class="at">sigma =</span> <span class="fl">0.05</span>, <span class="at">C =</span> <span class="fl">5.00</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>pred_probs <span class="ot">&lt;-</span> <span class="fu">predict</span>(tuned_mod, <span class="at">newdata =</span> test_sampl, <span class="at">type =</span> <span class="st">&#39;response&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>pred_probs <span class="ot">&lt;-</span> <span class="fu">predict</span>(tuned_mod, <span class="at">newdata =</span> test_sampl, <span class="at">type =</span> <span class="st">&#39;response&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Now, we need to find the ideal threshold for classification of the probabilities:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>roc_obj <span class="ot">&lt;-</span> <span class="fu">roc</span>(<span class="fu">ifelse</span>(test_sampl<span class="sc">$</span>DEFAULT <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>), <span class="fu">ifelse</span>(pred_probs <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>))</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>youden_index <span class="ot">&lt;-</span> roc_obj<span class="sc">$</span>sensitivities <span class="sc">+</span> roc_obj<span class="sc">$</span>specificities <span class="sc">-</span> <span class="dv">1</span></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>optimal_index <span class="ot">&lt;-</span> <span class="fu">which.max</span>(youden_index)</span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>optimal_threshold <span class="ot">&lt;-</span> roc_obj<span class="sc">$</span>thresholds[optimal_index]</span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>optimal_threshold</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>roc_obj <span class="ot">&lt;-</span> <span class="fu">roc</span>(<span class="fu">ifelse</span>(test_sampl<span class="sc">$</span>DEFAULT <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>), <span class="fu">ifelse</span>(pred_probs <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>))</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>youden_index <span class="ot">&lt;-</span> roc_obj<span class="sc">$</span>sensitivities <span class="sc">+</span> roc_obj<span class="sc">$</span>specificities <span class="sc">-</span> <span class="dv">1</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>optimal_index <span class="ot">&lt;-</span> <span class="fu">which.max</span>(youden_index)</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>optimal_threshold <span class="ot">&lt;-</span> roc_obj<span class="sc">$</span>thresholds[optimal_index]</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>optimal_threshold</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 0.5</code></pre>
 </div>
 </div>
 <p>We can now use this optimal threshold for the confusion matrix:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>mat3 <span class="ot">&lt;-</span> <span class="fu">confusionMatrix</span>(</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">factor</span>(<span class="fu">ifelse</span>(pred_probs <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>), <span class="at">levels =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">0</span>)), </span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">factor</span>(<span class="fu">ifelse</span>(test_sampl<span class="sc">$</span>DEFAULT <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>), <span class="at">levels =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">0</span>))</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>mat3</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>mat3 <span class="ot">&lt;-</span> <span class="fu">confusionMatrix</span>(</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">factor</span>(<span class="fu">ifelse</span>(pred_probs <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>), <span class="at">levels =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">0</span>)), </span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">factor</span>(<span class="fu">ifelse</span>(test_sampl<span class="sc">$</span>DEFAULT <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>), <span class="at">levels =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">0</span>))</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>mat3</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Confusion Matrix and Statistics
 
           Reference
 Prediction    1    0
-         1 1964  335
-         0  699 2555
-                                         
-               Accuracy : 0.8138         
-                 95% CI : (0.8033, 0.824)
-    No Information Rate : 0.5204         
-    P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
-                                         
-                  Kappa : 0.625          
-                                         
- Mcnemar&#39;s Test P-Value : &lt; 2.2e-16      
-                                         
-            Sensitivity : 0.7375         
-            Specificity : 0.8841         
-         Pos Pred Value : 0.8543         
-         Neg Pred Value : 0.7852         
-             Prevalence : 0.4796         
-         Detection Rate : 0.3537         
-   Detection Prevalence : 0.4140         
-      Balanced Accuracy : 0.8108         
-                                         
-       &#39;Positive&#39; Class : 1              
-                                         </code></pre>
+         1 2045  252
+         0  671 2585
+                                          
+               Accuracy : 0.8338          
+                 95% CI : (0.8237, 0.8435)
+    No Information Rate : 0.5109          
+    P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+                                          
+                  Kappa : 0.6663          
+                                          
+ Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
+                                          
+            Sensitivity : 0.7529          
+            Specificity : 0.9112          
+         Pos Pred Value : 0.8903          
+         Neg Pred Value : 0.7939          
+             Prevalence : 0.4891          
+         Detection Rate : 0.3683          
+   Detection Prevalence : 0.4137          
+      Balanced Accuracy : 0.8321          
+                                          
+       &#39;Positive&#39; Class : 1               
+                                          </code></pre>
 </div>
 </div>
 <p>Let’s also grab the AUC value:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>auc3 <span class="ot">&lt;-</span> <span class="fu">auc</span>(roc_obj)</span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>auc3</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>auc3 <span class="ot">&lt;-</span> <span class="fu">auc</span>(roc_obj)</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>auc3</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Area under the curve: 0.8108</code></pre>
+<pre><code>Area under the curve: 0.8321</code></pre>
 </div>
 </div>
 <p>Let’s compile all these metrics into a dataframe and save the results:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>performance <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;model&quot;</span> <span class="ot">=</span> <span class="st">&quot;Support Vector Machine&quot;</span>), </span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;hyperparameters&quot;</span> <span class="ot">=</span> <span class="fu">paste</span>(</span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>        <span class="fu">paste</span>(<span class="st">&quot;Sigma:&quot;</span>, <span class="fl">0.1</span>), </span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">paste</span>(<span class="st">&quot;C:&quot;</span>, <span class="fl">10.0</span>), </span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">collapse =</span> <span class="st">&quot;, &quot;</span></span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    )), </span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    mat3<span class="sc">$</span>overall[<span class="fu">c</span>(<span class="st">&quot;Accuracy&quot;</span>)], </span>
-<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    mat3<span class="sc">$</span>byClass[<span class="fu">c</span>(<span class="st">&quot;Precision&quot;</span>, <span class="st">&quot;Recall&quot;</span>)], </span>
-<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;AUC&quot;</span> <span class="ot">=</span> auc3)</span>
-<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>performance</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>performance <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;model&quot;</span> <span class="ot">=</span> <span class="st">&quot;Support Vector Machine&quot;</span>), </span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;hyperparameters&quot;</span> <span class="ot">=</span> <span class="fu">paste</span>(</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>        <span class="fu">paste</span>(<span class="st">&quot;Sigma:&quot;</span>, <span class="fl">0.1</span>), </span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">paste</span>(<span class="st">&quot;C:&quot;</span>, <span class="fl">10.0</span>), </span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">collapse =</span> <span class="st">&quot;, &quot;</span></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>    )), </span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    mat3<span class="sc">$</span>overall[<span class="fu">c</span>(<span class="st">&quot;Accuracy&quot;</span>)], </span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>    mat3<span class="sc">$</span>byClass[<span class="fu">c</span>(<span class="st">&quot;Precision&quot;</span>, <span class="st">&quot;Recall&quot;</span>)], </span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;AUC&quot;</span> <span class="ot">=</span> auc3)</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>performance</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>                   model          hyperparameters                 Accuracy 
-&quot;Support Vector Machine&quot;       &quot;Sigma: 0.1 C: 10&quot;      &quot;0.813794345398884&quot; 
+&quot;Support Vector Machine&quot;       &quot;Sigma: 0.1 C: 10&quot;      &quot;0.833783540428597&quot; 
                Precision                   Recall                      AUC 
-     &quot;0.854284471509352&quot;      &quot;0.737514081862561&quot;       &quot;0.81079856342263&quot; </code></pre>
+     &quot;0.890291684806269&quot;      &quot;0.752945508100147&quot;      &quot;0.832059641607352&quot; </code></pre>
 </div>
 </div>
 <div class="cell" data-ignore="true">
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">data.frame</span>(<span class="fu">as.list</span>(performance)) <span class="sc">|&gt;</span></span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">write.csv</span>(<span class="st">&#39;models/support-vector-machine/model-results.csv&#39;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">data.frame</span>(<span class="fu">as.list</span>(performance)) <span class="sc">|&gt;</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">write.csv</span>(<span class="st">&#39;models/support-vector-machine/model-results.csv&#39;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="conclusion" class="level2">

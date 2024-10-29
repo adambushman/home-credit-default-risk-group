@@ -32,6 +32,7 @@ library('tidyverse')
 library('e1071')
 library('caret')
 library('pROC')
+library('rsample')
 ```
 
 We'll load the cleaned, balanced, training data:
@@ -60,9 +61,9 @@ partition_idx <- createDataPartition(data$DEFAULT, p = 0.8, list = FALSE)
 full_train <- data[partition_idx,]
 full_test <- data[-partition_idx,]
 
-# 1% sample of the data
+# 2% sample of the data
 train_sampl <- sample_n(
-    full_train, ceiling(nrow(full_train) * 0.01)
+    full_train, ceiling(nrow(full_train) * 0.02)
 )
 test_sampl <- sample_n(
     full_test, ceiling(nrow(full_test) * 0.05)
@@ -81,21 +82,17 @@ All features in this file may conceivably be helpful in predicting `DEFAULT` (or
 
 ## Support Vector machine
 
-We also want to setup our cross validation, which includes a hyperparameter tuning grid and a training control object:
+We also want to setup our cross validation requiring folds, a tuning grid, and a loop:
 
 ```{r}
-fitControl <- trainControl(
-    method = "repeatedcv", 
-    number = 5, 
-    repeats = 2, 
-    classProbs = TRUE, 
-    summaryFunction = twoClassSummary, 
-    savePredictions = TRUE
-)
+train_folds <- rsample::vfold_cv(train_sampl)
+```
 
+```{r}
 fitGrid <- expand.grid(
     sigma = c(0.01, 0.05), 
-    C = c(0.01, 0.5, 1, 5, 10)
+    C = c(0.01, 0.5, 1, 5, 10), 
+    AUC = 0
 )
 ```
 
@@ -105,24 +102,49 @@ fitGrid <- expand.grid(
 We can now setup a cross-validated training of `DEFAULT` with the SMOTE data:
 
 ```{r}
-mod03 <- train(
-    DEFAULT ~ ., 
-    data = train_sampl, 
-    method = "svmRadial", 
-    trControl = fitControl, 
-    metric = "ROC",  # Use ROC for AUC
-    tuneGrid = fitGrid
-)
+runCvSVM <- function(grid, folds) {
+    for(i in 1:nrow(folds)) {
+        # Values for modeling
+        fold <- folds$splits[i][[1]]
+        sigma <- grid$sigma[i]
+        C <- grid$C[i]
 
-mod03
+        # Training
+        train <- training(fold)
+        unique <- sapply(train, function(x) length(unique(x)))
+        remove_cols <- names(unique[unique == 1])
+
+        train <- train |> select(-all_of(remove_cols))
+        modl <- e1071::svm(DEFAULT ~ ., data = train, sigma = sigma, C = C)
+        
+        # Testing
+        test <- testing(fold) |> select(-all_of(remove_cols))
+        pred <- predict(modl, newdata = test, type = 'response')
+
+        # Evaluation
+        roc_obj <- roc(ifelse(test$DEFAULT == "Y", 1, 0), ifelse(pred == "Y", 1, 0))
+        auc <- auc(roc_obj)
+
+        # Save measure
+        grid$AUC[i] = auc
+        print(paste0("AUC from fold ", i, ":"))
+        print(auc)
+    }
+    return(grid)
+}
 ```
 
-The AUC values are pretty poor. At around 0.56, that's not much better than a random guess or using the majority class. 
+```{r}
+results <- runCvSVM(fitGrid, train_folds)
+results
+```
 
-Let's now generate full metrics from the best model we've got here. Fisrt, we'll use the model details we found before:
+The AUC values are looking really great. At around 0.83, that's even better than we were estimating with a balanced, penalized regression model.
+
+Let's now generate full metrics from the best model we've got here: `sigma = 0.05` and `C = 5.00`:
 
 ```{r}
-tuned_mod <- e1071::svm(DEFAULT ~ ., data = train_sampl, sigma = 0.01, C = 0.05)
+tuned_mod <- e1071::svm(DEFAULT ~ ., data = train_sampl, sigma = 0.05, C = 5.00)
 ```
 
 ```{r}
