@@ -42,38 +42,3 @@ predictors <- as.matrix(
 ```
 
 
-## Basic Modeling
-
-Let's run an elastic net model leveraging cross validation. We'll use the default 10 folds. The output we get will measure `AUC` and the standard error thereof.
-
-```{r}
-mod <- cv.glmnet(
-    x = predictors, 
-    y = target, 
-    family = "binomial", 
-    alpha = 0.5, 
-    type.measure = "auc"
-)
-
-mod
-```
-
-Using an elastic net model, we're achievingg an AUC of `~0.73` with a standard error of `0.0012` with 25 variables. 
-
-```{r}
-plot(mod)
-```
-
-Let's look at the significant coefficients for the `1se` model since its VERY close to the absolute minimum in terms of performance:
-
-```{r}
-coef <- coef(mod, "lambda.1se")
-coef_df <- as.data.frame(as.matrix(coef))
-coef_df$Predictor <- rownames(coef)
-colnames(coef_df)[1] <- "Coefficient"
-
-coef_df |>
-    select(Predictor, Coefficient) |>
-    arrange(desc(abs(Coefficient)))
-```
-
