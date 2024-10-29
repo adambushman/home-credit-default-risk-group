@@ -12,33 +12,3 @@ I'm focusing on modeling for `TARGET` using the below method(s):
 1.  Penalized Regression
 
 
-## Prep
-
-Let's load a few libraries:
-
-```{r}
-library('tidyverse')
-library('glmnet')
-```
-
-We'll load the cleaned, training data:
-
-```{r}
-data <- data.table::fread('data/application_train_clean.csv') |>
-    as.data.frame()
-
-glimpse(data)
-```
-
-All features in this file may conceivably be helpful in predicting `DEFAULT` (originally named `TARGET`), with exception of `SK_ID_CURR`. We do, however, have  little to no way of knowing which will be predictive. Therefore, an elastic net is probably the best choice.
-
-Let's prepare the data:
-
-```{r}
-target <- data$DEFAULT
-predictors <- as.matrix(
-    data[,-which(names(data) == "DEFAULT")]
-)
-```
-
-
