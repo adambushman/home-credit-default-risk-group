@@ -1,0 +1,2 @@
+"model","hyperparameters","Accuracy","Precision","Recall","AUC"
+"Support Vector Machine","Sigma: 0.1 C: 10","0.813794345398884","0.854284471509352","0.737514081862561","0.81079856342263"

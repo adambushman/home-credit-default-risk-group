@@ -31,16 +31,17 @@ Let's load a few libraries:
 library('tidyverse')
 library('e1071')
 library('caret')
-library('smotefamily')
+library('pROC')
 ```
 
-We'll load the cleaned, training data:
+We'll load the cleaned, balanced, training data:
 
 ```{r}
-path <- 'data/application_train_clean.csv'
+path <- 'D:/All Repos/home-credit-default-risk-group/data/application_train_smote.csv'
 
 data <- data.table::fread(path) |>
-    as.data.frame()
+    as.data.frame() |> 
+    mutate(DEFAULT = factor(DEFAULT, levels = c("N", "Y")))
 
 glimpse(data)
 ```
@@ -49,68 +50,38 @@ All features in this file may conceivably be helpful in predicting `DEFAULT` (or
 
 We do have a class imbalance to work out: 
 
-```{r}
-unique <- sapply(data, function(x) length(unique(x)))
-
-unique[unique == 1]
-```
-
-Let's remove `FLAG_MOBIL` and `SK_ID_CURR` such from our sample and format the data to handle SMOTE:
+We'll work with a sample of the data since we have over 300K records.
 
 ```{r}
-data_clean <- data |> 
-    select(-c(SK_ID_CURR, FLAG_MOBIL)) |>
-    mutate(
-        DEFAULT = factor(DEFAULT), 
-        across(where(is.character) & -DEFAULT, ~factor(make.names(.))), 
-        across(where(is.logical), ~factor(ifelse(.,"Y","N")))
-    )
-```
+set.seed(2015)
 
-We need to handle class imbalance:
+# Splits
+partition_idx <- createDataPartition(data$DEFAULT, p = 0.8, list = FALSE)
+full_train <- data[partition_idx,]
+full_test <- data[-partition_idx,]
 
-```{r}
-table(data_clean$DEFAULT) |>
-    prop.table()
-```
-
-Because of how much data is available to use, let's perform over-sampling on the minority class. We can use the SMOTE technique thanks to the `{smotefamily}` package.
-
-We first must turn the factors into one-hot-encoded values:
-
-```{r}
-dmy <- dummyVars("~ . -DEFAULT", data_clean)
-data_dmy <- data.frame(predict(dmy, data_clean))
-```
-
-```{r}
-smote_results <- SMOTE(
-    data_dmy, 
-    target = data_clean$DEFAULT
+# 1% sample of the data
+train_sampl <- sample_n(
+    full_train, ceiling(nrow(full_train) * 0.01)
 )
-
-data_smote <- smote_results$data |>
-    mutate(DEFAULT = ifelse(class == "TRUE", "Y", "N")) |>
-    select(-class)
-```
-
-We can double check the new weighting:
-
-```{r}
-table(data_smote$DEFAULT) |>
-    prop.table()
-```
-
-We now want to take a sample of the data since its so large. We'll work with a 2%:
-
-```{r}
-data_smote_sampl <- sample_n(
-    data_smote, 
-    ceiling(nrow(data_smote) * 0.02)
+test_sampl <- sample_n(
+    full_test, ceiling(nrow(full_test) * 0.05)
 )
 ```
 
-We also want to setup our cross validation:
+```{r}
+unique <- sapply(train_sampl, function(x) length(unique(x)))
+remove_cols <- names(unique[unique == 1])
+
+train_sampl <- train_sampl |> select(-all_of(remove_cols))
+test_sampl <- test_sampl |> select(-all_of(remove_cols))
+```
+
+All features in this file may conceivably be helpful in predicting `DEFAULT` (originally named `TARGET`) so we shouldn't need to subset any of them.
+
+## Support Vector machine
+
+We also want to setup our cross validation, which includes a hyperparameter tuning grid and a training control object:
 
 ```{r}
 fitControl <- trainControl(
@@ -136,7 +107,7 @@ We can now setup a cross-validated training of `DEFAULT` with the SMOTE data:
 ```{r}
 mod03 <- train(
     DEFAULT ~ ., 
-    data = data_smote_sampl, 
+    data = train_sampl, 
     method = "svmRadial", 
     trControl = fitControl, 
     metric = "ROC",  # Use ROC for AUC
@@ -146,7 +117,73 @@ mod03 <- train(
 mod03
 ```
 
-## Tuned Modeling
+The AUC values are pretty poor. At around 0.56, that's not much better than a random guess or using the majority class. 
 
+Let's now generate full metrics from the best model we've got here. Fisrt, we'll use the model details we found before:
+
+```{r}
+tuned_mod <- e1071::svm(DEFAULT ~ ., data = train_sampl, sigma = 0.01, C = 0.05)
+```
+
+```{r}
+pred_probs <- predict(tuned_mod, newdata = test_sampl, type = 'response')
+```
+
+Now, we need to find the ideal threshold for classification of the probabilities:
+
+```{r}
+#| warning: false
+roc_obj <- roc(ifelse(test_sampl$DEFAULT == "Y", 1, 0), ifelse(pred_probs == "Y", 1, 0))
+youden_index <- roc_obj$sensitivities + roc_obj$specificities - 1
+
+optimal_index <- which.max(youden_index)
+optimal_threshold <- roc_obj$thresholds[optimal_index]
+optimal_threshold
+```
+
+We can now use this optimal threshold for the confusion matrix:
+
+```{r}
+mat3 <- confusionMatrix(
+    factor(ifelse(pred_probs == "Y", 1, 0), levels = c(1,0)), 
+    factor(ifelse(test_sampl$DEFAULT == "Y", 1, 0), levels = c(1,0))
+)
+
+mat3
+```
+
+Let's also grab the AUC value:
+
+```{r}
+auc3 <- auc(roc_obj)
+auc3
+```
+
+Let's compile all these metrics into a dataframe and save the results:
+
+```{r}
+performance <- c(
+    c("model" = "Support Vector Machine"), 
+    c("hyperparameters" = paste(
+        paste("Sigma:", 0.1), 
+        paste("C:", 10.0), 
+        collapse = ", "
+    )), 
+    mat3$overall[c("Accuracy")], 
+    mat3$byClass[c("Precision", "Recall")], 
+    c("AUC" = auc3)
+)
+
+performance
+```
+
+```{r}
+#| ignore: true
+#| eval: false
+data.frame(as.list(performance)) |>
+    write.csv('models/support-vector-machine/model-results.csv', row.names = FALSE)
+```
 
 ## Conclusion
+
+Despite all of my research, I can't figure out why the cross validation AUC is so poor but the AUC with the testing data is so good. It has to be an issue with the cross validation using caret. 
