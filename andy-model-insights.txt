@@ -1,0 +1,16 @@
+Elastic Net: 
+-It seems like you did a really great, thorough job exploring this penalized regression to sift through all the different possible predictors to find which ones are the strongest. It seems like we reached a kind of wall, where we couldn't get the AUC much higher than 0.71, despite alpha tuning and adding interaction terms, which suggests another method like random forest might give us the predictive power we'd want in a model like this.
+-From what I'm researching online, grid-searching a range of alpha and lambda values, as well as expanding the lambda range, could be useful to see if we can get the AUC any higher.
+
+
+SVM:
+-The low ROC scores we're currently getting (at least from the current iteration of this code, accessed at about 1pm on 10/28/24) could be because the data is so imbalanced (92% default vs 8% default in the data). From what I'm finding online, we could try class weighting, SMOTE, or undersampling the original data to help the SVM model deal with this balancing, which would hopefully yield a better ROC.
+
+
+Random Forest:
+-Great work on this, where it looks to me like you've handled the data imbalance well by calculating class weights based on proportions, and identified important model features that line up well with what Adam found with the elastic net (namely that the three EXT_SOURCE variables are good predictors. 
+-The drop in AUC from the train dataset to the test could mean there's some overfitting going on, which hyperparameter tuning could help us with. We could look at grid-searching like with the elastic net as well as cross-validation.
+
+
+SUMMARY:
+It looks like we're on a good track with these models, and I think these three kinds of models are the best tools we have for working with a classification case like this. From what I'm seeing, the next steps should be fine tuning the hyperparameters (alpha and lambda in the case of the elastic net; number of trees, maximum depth, minimum node size, etc. in the case of the random forest) to see if we can increase our AUC and other metrics to have the best predictive power possible.
