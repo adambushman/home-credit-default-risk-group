@@ -3118,105 +3118,230 @@ vertical-align: -.125em;
 
 <section id="approach" class="level1">
 <h1>Approach</h1>
-<p>I’m focusing on modeling for <code>DEFAULT</code> using the below method(s):</p>
-<ol type="1">
-<li>Penalized Regression</li>
-<li>Support Vector Classifier</li>
-</ol>
+<p>I’m focusing on modeling for <code>DEFAULT</code> using Penalized Regression.</p>
 <section id="prep" class="level2">
 <h2 class="anchored" data-anchor-id="prep">Prep</h2>
 <p>Let’s load a few libraries:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;tidyverse&#39;</span>)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;glmnet&#39;</span>)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;e1071&#39;</span>)</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;caret&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;caret&#39;</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;pROC&#39;</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">&#39;rsample&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>We’ll load the cleaned, training data:</p>
+<p>We’ll load the cleaned, balanced, training data:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>path <span class="ot">&lt;-</span> <span class="st">&#39;D:/All Repos/home-credit-default-risk-group/data/application_train_clean.csv&#39;</span></span>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>path <span class="ot">&lt;-</span> <span class="st">&#39;D:/All Repos/home-credit-default-risk-group/data/application_train_smote.csv&#39;</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>data <span class="ot">&lt;-</span> data.table<span class="sc">::</span><span class="fu">fread</span>(path) <span class="sc">|&gt;</span></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.data.frame</span>()</span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Rows: 307,216
-Columns: 58
-$ SK_ID_CURR                  &lt;int&gt; 100002, 100003, 100004, 100006, 100007, 10…
-$ DEFAULT                     &lt;lgl&gt; TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, F…
-$ CASH_LOAN                   &lt;lgl&gt; TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE,…
-$ GENDER_MALE                 &lt;lgl&gt; TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, FALS…
-$ FLAG_OWN_CAR                &lt;lgl&gt; FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, T…
-$ FLAG_OWN_REALTY             &lt;lgl&gt; TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE,…
-$ CNT_CHILDREN                &lt;int&gt; 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, …
-$ AMT_INCOME_TOTAL            &lt;dbl&gt; 202500.00, 270000.00, 67500.00, 135000.00,…
-$ AMT_CREDIT                  &lt;dbl&gt; 406597.5, 1293502.5, 135000.0, 312682.5, 5…
-$ AMT_ANNUITY                 &lt;dbl&gt; 24700.5, 35698.5, 6750.0, 29686.5, 21865.5…
-$ AMT_GOODS_PRICE             &lt;dbl&gt; 351000, 1129500, 135000, 297000, 513000, 4…
-$ NAME_TYPE_SUITE             &lt;chr&gt; &quot;Unaccompanied&quot;, &quot;Family&quot;, &quot;Unaccompanied&quot;…
-$ NAME_INCOME_TYPE            &lt;chr&gt; &quot;Working&quot;, &quot;State servant&quot;, &quot;Working&quot;, &quot;Wo…
-$ NAME_EDUCATION_TYPE         &lt;chr&gt; &quot;Secondary / secondary special&quot;, &quot;Higher e…
-$ NAME_FAMILY_STATUS          &lt;chr&gt; &quot;Single / not married&quot;, &quot;Married&quot;, &quot;Single…
-$ NAME_HOUSING_TYPE           &lt;chr&gt; &quot;House / apartment&quot;, &quot;House / apartment&quot;, …
-$ REGION_POPULATION_RELATIVE  &lt;dbl&gt; 0.018801, 0.003541, 0.010032, 0.008019, 0.…
-$ DAYS_BIRTH                  &lt;int&gt; -9461, -16765, -19046, -19005, -19932, -16…
-$ DAYS_EMPLOYED               &lt;int&gt; -637, -1188, -225, -3039, -3038, -1588, -3…
-$ DAYS_REGISTRATION           &lt;dbl&gt; -3648, -1186, -4260, -9833, -4311, -4970, …
-$ DAYS_ID_PUBLISH             &lt;int&gt; -2120, -291, -2531, -2437, -3458, -477, -6…
-$ OWN_CAR_AGE                 &lt;int&gt; 0, 0, 27, 0, 0, 0, 18, 9, 0, 0, 0, 0, 0, 2…
-$ FLAG_MOBIL                  &lt;lgl&gt; TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, …
-$ FLAG_EMP_PHONE              &lt;lgl&gt; TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, …
-$ FLAG_WORK_PHONE             &lt;lgl&gt; FALSE, FALSE, TRUE, FALSE, FALSE, TRUE, FA…
-$ FLAG_CONT_MOBILE            &lt;lgl&gt; TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, …
-$ FLAG_PHONE                  &lt;lgl&gt; TRUE, TRUE, TRUE, FALSE, FALSE, TRUE, TRUE…
-$ FLAG_EMAIL                  &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, …
-$ OCCUPATION_TYPE             &lt;chr&gt; &quot;Laborers&quot;, &quot;Core staff&quot;, &quot;Laborers&quot;, &quot;Lab…
-$ CNT_FAM_MEMBERS             &lt;int&gt; 1, 2, 1, 2, 1, 2, 3, 2, 2, 1, 3, 2, 2, 3, …
-$ REGION_RATING_CLIENT        &lt;int&gt; 2, 1, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, …
-$ REGION_RATING_CLIENT_W_CITY &lt;int&gt; 2, 1, 2, 2, 2, 2, 2, 3, 2, 2, 2, 2, 2, 2, …
-$ WEEKDAY_APPR_PROCESS_START  &lt;chr&gt; &quot;WEDNESDAY&quot;, &quot;MONDAY&quot;, &quot;MONDAY&quot;, &quot;WEDNESDA…
-$ HOUR_APPR_PROCESS_START     &lt;int&gt; 10, 11, 9, 17, 11, 16, 16, 16, 14, 8, 15, …
-$ REG_REGION_NOT_LIVE_REGION  &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, …
-$ REG_REGION_NOT_WORK_REGION  &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, …
-$ LIVE_REGION_NOT_WORK_REGION &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, …
-$ REG_CITY_NOT_LIVE_CITY      &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, …
-$ REG_CITY_NOT_WORK_CITY      &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, F…
-$ LIVE_CITY_NOT_WORK_CITY     &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, F…
-$ ORGANIZATION_TYPE           &lt;chr&gt; &quot;Business Entity Type 3&quot;, &quot;School&quot;, &quot;Gover…
-$ EXT_SOURCE_1                &lt;dbl&gt; 0.08303697, 0.31126731, 0.50212940, 0.5021…
-$ EXT_SOURCE_2                &lt;dbl&gt; 0.2629486, 0.6222458, 0.5559121, 0.6504417…
-$ EXT_SOURCE_3                &lt;dbl&gt; 0.13937578, 0.53527625, 0.72956669, 0.5352…
-$ OBS_30_CNT_SOCIAL_CIRCLE    &lt;int&gt; 2, 1, 0, 2, 0, 0, 1, 2, 1, 2, 0, 0, 0, 0, …
-$ DEF_30_CNT_SOCIAL_CIRCLE    &lt;int&gt; 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, …
-$ OBS_60_CNT_SOCIAL_CIRCLE    &lt;int&gt; 2, 1, 0, 2, 0, 0, 1, 2, 1, 2, 0, 0, 0, 0, …
-$ DEF_60_CNT_SOCIAL_CIRCLE    &lt;int&gt; 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, …
-$ DAYS_LAST_PHONE_CHANGE      &lt;int&gt; -1134, -828, -815, -617, -1106, -2536, -15…
-$ AMT_REQ_CREDIT_BUREAU_HOUR  &lt;int&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, …
-$ AMT_REQ_CREDIT_BUREAU_DAY   &lt;int&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, …
-$ AMT_REQ_CREDIT_BUREAU_WEEK  &lt;int&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, …
-$ AMT_REQ_CREDIT_BUREAU_MON   &lt;int&gt; 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, …
-$ AMT_REQ_CREDIT_BUREAU_QRT   &lt;int&gt; 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, …
-$ AMT_REQ_CREDIT_BUREAU_YEAR  &lt;int&gt; 1, 0, 0, 0, 0, 1, 2, 0, 1, 0, 0, 2, 0, 1, …
-$ IMPUTED_EXT1                &lt;lgl&gt; FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALS…
-$ IMPUTED_EXT2                &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, …
-$ IMPUTED_EXT3                &lt;lgl&gt; FALSE, TRUE, FALSE, TRUE, TRUE, FALSE, FAL…</code></pre>
+<pre><code>Rows: 555,256
+Columns: 181
+$ CASH_LOAN.N                                       &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ CASH_LOAN.Y                                       &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ GENDER_MALE.N                                     &lt;dbl&gt; 0, 1, 1, 1, 0, 1, 1,…
+$ GENDER_MALE.Y                                     &lt;dbl&gt; 1, 0, 0, 0, 1, 0, 0,…
+$ FLAG_OWN_CAR.N                                    &lt;dbl&gt; 0, 0, 1, 1, 0, 1, 1,…
+$ FLAG_OWN_CAR.Y                                    &lt;dbl&gt; 1, 1, 0, 0, 1, 0, 0,…
+$ FLAG_OWN_REALTY.N                                 &lt;dbl&gt; 1, 0, 0, 0, 1, 1, 0,…
+$ FLAG_OWN_REALTY.Y                                 &lt;dbl&gt; 0, 1, 1, 1, 0, 0, 1,…
+$ CNT_CHILDREN                                      &lt;dbl&gt; 0, 1, 0, 0, 0, 1, 0,…
+$ AMT_INCOME_TOTAL                                  &lt;dbl&gt; 90000, 252000, 31500…
+$ AMT_CREDIT                                        &lt;dbl&gt; 263686.5, 675000.0, …
+$ AMT_ANNUITY                                       &lt;dbl&gt; 19237.5, 53460.0, 52…
+$ AMT_GOODS_PRICE                                   &lt;dbl&gt; 238500, 675000, 9000…
+$ NAME_TYPE_SUITE.Children                          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_TYPE_SUITE.Family                            &lt;dbl&gt; 0, 1, 0, 0, 0, 0, 1,…
+$ NAME_TYPE_SUITE.Group.of.people                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_TYPE_SUITE.Other_A                           &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_TYPE_SUITE.Other_B                           &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_TYPE_SUITE.Spouse..partner                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_TYPE_SUITE.Unaccompanied                     &lt;dbl&gt; 1, 0, 1, 1, 1, 1, 0,…
+$ NAME_INCOME_TYPE.Businessman                      &lt;int&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_INCOME_TYPE.Commercial.associate             &lt;dbl&gt; 0, 0, 1, 1, 0, 0, 0,…
+$ NAME_INCOME_TYPE.Maternity.leave                  &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_INCOME_TYPE.Pensioner                        &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 1,…
+$ NAME_INCOME_TYPE.State.servant                    &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_INCOME_TYPE.Student                          &lt;int&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_INCOME_TYPE.Unemployed                       &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_INCOME_TYPE.Working                          &lt;dbl&gt; 1, 1, 0, 0, 1, 1, 0,…
+$ NAME_EDUCATION_TYPE.Academic.degree               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_EDUCATION_TYPE.Higher.education              &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_EDUCATION_TYPE.Incomplete.higher             &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_EDUCATION_TYPE.Lower.secondary               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_EDUCATION_TYPE.Secondary...secondary.special &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ NAME_FAMILY_STATUS.Civil.marriage                 &lt;dbl&gt; 0, 0, 0, 0, 0, 1, 0,…
+$ NAME_FAMILY_STATUS.Married                        &lt;dbl&gt; 1, 1, 1, 0, 1, 0, 0,…
+$ NAME_FAMILY_STATUS.Separated                      &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_FAMILY_STATUS.Single...not.married           &lt;dbl&gt; 0, 0, 0, 1, 0, 0, 0,…
+$ NAME_FAMILY_STATUS.Widow                          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 1,…
+$ NAME_HOUSING_TYPE.Co.op.apartment                 &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_HOUSING_TYPE.House...apartment               &lt;dbl&gt; 0, 1, 1, 0, 1, 1, 1,…
+$ NAME_HOUSING_TYPE.Municipal.apartment             &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_HOUSING_TYPE.Office.apartment                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_HOUSING_TYPE.Rented.apartment                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ NAME_HOUSING_TYPE.With.parents                    &lt;dbl&gt; 1, 0, 0, 1, 0, 0, 0,…
+$ REGION_POPULATION_RELATIVE                        &lt;dbl&gt; 0.002134, 0.014520, …
+$ DAYS_BIRTH                                        &lt;dbl&gt; -10042, -10464, -172…
+$ DAYS_EMPLOYED                                     &lt;dbl&gt; -1598, -2245, -195, …
+$ DAYS_REGISTRATION                                 &lt;dbl&gt; -167, -169, -11387, …
+$ DAYS_ID_PUBLISH                                   &lt;dbl&gt; -2529, -3111, -180, …
+$ OWN_CAR_AGE                                       &lt;dbl&gt; 19, 15, 0, 0, 4, 0, …
+$ FLAG_EMP_PHONE.N                                  &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 1,…
+$ FLAG_EMP_PHONE.Y                                  &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 0,…
+$ FLAG_WORK_PHONE.N                                 &lt;dbl&gt; 1, 1, 0, 1, 1, 1, 1,…
+$ FLAG_WORK_PHONE.Y                                 &lt;dbl&gt; 0, 0, 1, 0, 0, 0, 0,…
+$ FLAG_CONT_MOBILE.N                                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ FLAG_CONT_MOBILE.Y                                &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ FLAG_PHONE.N                                      &lt;dbl&gt; 1, 1, 0, 1, 1, 1, 0,…
+$ FLAG_PHONE.Y                                      &lt;dbl&gt; 0, 0, 1, 0, 0, 0, 1,…
+$ FLAG_EMAIL.N                                      &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ FLAG_EMAIL.Y                                      &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Accountants                       &lt;dbl&gt; 0, 0, 1, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Cleaning.staff                    &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Cooking.staff                     &lt;dbl&gt; 0, 0, 0, 0, 1, 0, 0,…
+$ OCCUPATION_TYPE.Core.staff                        &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Drivers                           &lt;dbl&gt; 1, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.High.skill.tech.staff             &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.HR.staff                          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.IT.staff                          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Laborers                          &lt;dbl&gt; 0, 0, 0, 0, 0, 1, 0,…
+$ OCCUPATION_TYPE.Low.skill.Laborers                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Managers                          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Medicine.staff                    &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Private.service.staff             &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Realty.agents                     &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Sales.staff                       &lt;dbl&gt; 0, 1, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Secretaries                       &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Security.staff                    &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ OCCUPATION_TYPE.Waiters.barmen.staff              &lt;dbl&gt; 0, 0, 0, 1, 0, 0, 0,…
+$ OCCUPATION_TYPE.XNA                               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 1,…
+$ CNT_FAM_MEMBERS                                   &lt;dbl&gt; 2, 3, 2, 1, 2, 3, 1,…
+$ REGION_RATING_CLIENT                              &lt;dbl&gt; 3, 2, 1, 2, 2, 2, 2,…
+$ REGION_RATING_CLIENT_W_CITY                       &lt;dbl&gt; 3, 2, 1, 2, 2, 2, 2,…
+$ WEEKDAY_APPR_PROCESS_START.FRIDAY                 &lt;dbl&gt; 1, 1, 0, 1, 0, 0, 0,…
+$ WEEKDAY_APPR_PROCESS_START.MONDAY                 &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ WEEKDAY_APPR_PROCESS_START.SATURDAY               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ WEEKDAY_APPR_PROCESS_START.SUNDAY                 &lt;dbl&gt; 0, 0, 1, 0, 0, 0, 0,…
+$ WEEKDAY_APPR_PROCESS_START.THURSDAY               &lt;dbl&gt; 0, 0, 0, 0, 0, 1, 1,…
+$ WEEKDAY_APPR_PROCESS_START.TUESDAY                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ WEEKDAY_APPR_PROCESS_START.WEDNESDAY              &lt;dbl&gt; 0, 0, 0, 0, 1, 0, 0,…
+$ HOUR_APPR_PROCESS_START                           &lt;dbl&gt; 8, 12, 10, 13, 15, 1…
+$ REG_REGION_NOT_LIVE_REGION.N                      &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ REG_REGION_NOT_LIVE_REGION.Y                      &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ REG_REGION_NOT_WORK_REGION.N                      &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ REG_REGION_NOT_WORK_REGION.Y                      &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ LIVE_REGION_NOT_WORK_REGION.N                     &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ LIVE_REGION_NOT_WORK_REGION.Y                     &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ REG_CITY_NOT_LIVE_CITY.N                          &lt;dbl&gt; 1, 1, 1, 0, 0, 1, 1,…
+$ REG_CITY_NOT_LIVE_CITY.Y                          &lt;dbl&gt; 0, 0, 0, 1, 1, 0, 0,…
+$ REG_CITY_NOT_WORK_CITY.N                          &lt;dbl&gt; 1, 1, 1, 0, 0, 1, 1,…
+$ REG_CITY_NOT_WORK_CITY.Y                          &lt;dbl&gt; 0, 0, 0, 1, 1, 0, 0,…
+$ LIVE_CITY_NOT_WORK_CITY.N                         &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ LIVE_CITY_NOT_WORK_CITY.Y                         &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Advertising                     &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Agriculture                     &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Bank                            &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Business.Entity.Type.1          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Business.Entity.Type.2          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Business.Entity.Type.3          &lt;dbl&gt; 1, 0, 1, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Cleaning                        &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Construction                    &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Culture                         &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Electricity                     &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Emergency                       &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Government                      &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Hotel                           &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Housing                         &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.1                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.10               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.11               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.12               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.13               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.2                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.3                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.4                &lt;dbl&gt; 0, 1, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.5                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.6                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.7                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.8                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Industry..type.9                &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Insurance                       &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Kindergarten                    &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Legal.Services                  &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Medicine                        &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Military                        &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Mobile                          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Other                           &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Police                          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Postal                          &lt;dbl&gt; 0, 0, 0, 0, 0, 1, 0,…
+$ ORGANIZATION_TYPE.Realtor                         &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Religion                        &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Restaurant                      &lt;dbl&gt; 0, 0, 0, 1, 1, 0, 0,…
+$ ORGANIZATION_TYPE.School                          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Security                        &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Security.Ministries             &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Self.employed                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Services                        &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Telecom                         &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Trade..type.1                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Trade..type.2                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Trade..type.3                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Trade..type.4                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Trade..type.5                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Trade..type.6                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Trade..type.7                   &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Transport..type.1               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Transport..type.2               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Transport..type.3               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.Transport..type.4               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.University                      &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ ORGANIZATION_TYPE.XNA                             &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 1,…
+$ EXT_SOURCE_1                                      &lt;dbl&gt; 0.5021294, 0.4415526…
+$ EXT_SOURCE_2                                      &lt;dbl&gt; 0.149016484, 0.48337…
+$ EXT_SOURCE_3                                      &lt;dbl&gt; 0.3996756, 0.5406545…
+$ OBS_30_CNT_SOCIAL_CIRCLE                          &lt;dbl&gt; 2, 0, 0, 1, 0, 1, 0,…
+$ DEF_30_CNT_SOCIAL_CIRCLE                          &lt;dbl&gt; 1, 0, 0, 0, 0, 1, 0,…
+$ OBS_60_CNT_SOCIAL_CIRCLE                          &lt;dbl&gt; 2, 0, 0, 1, 0, 1, 0,…
+$ DEF_60_CNT_SOCIAL_CIRCLE                          &lt;dbl&gt; 1, 0, 0, 0, 0, 1, 0,…
+$ DAYS_LAST_PHONE_CHANGE                            &lt;dbl&gt; -889, -1043, 0, -251…
+$ AMT_REQ_CREDIT_BUREAU_HOUR                        &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ AMT_REQ_CREDIT_BUREAU_DAY                         &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ AMT_REQ_CREDIT_BUREAU_WEEK                        &lt;dbl&gt; 0, 0, 1, 0, 0, 0, 0,…
+$ AMT_REQ_CREDIT_BUREAU_MON                         &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 1,…
+$ AMT_REQ_CREDIT_BUREAU_QRT                         &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ AMT_REQ_CREDIT_BUREAU_YEAR                        &lt;dbl&gt; 2, 1, 1, 1, 4, 1, 1,…
+$ IMPUTED_EXT1.N                                    &lt;dbl&gt; 0, 1, 1, 1, 1, 1, 0,…
+$ IMPUTED_EXT1.Y                                    &lt;dbl&gt; 1, 0, 0, 0, 0, 0, 1,…
+$ IMPUTED_EXT2.N                                    &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ IMPUTED_EXT2.Y                                    &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ IMPUTED_EXT3.N                                    &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1,…
+$ IMPUTED_EXT3.Y                                    &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0,…
+$ DEFAULT                                           &lt;chr&gt; &quot;Y&quot;, &quot;Y&quot;, &quot;Y&quot;, &quot;Y&quot;, …</code></pre>
 </div>
 </div>
 <p>We’ll work with a sample of the data since we have over 300K records.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">814</span>)</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 10% sample of the data</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>data_sampl <span class="ot">&lt;-</span> <span class="fu">sample_n</span>(</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    data, </span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ceiling</span>(<span class="fu">nrow</span>(data) <span class="sc">*</span> <span class="fl">0.1</span>)</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Splits</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>split_obj <span class="ot">&lt;-</span> <span class="fu">initial_split</span>(data)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>full_train <span class="ot">&lt;-</span> <span class="fu">training</span>(split_obj)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>full_test <span class="ot">&lt;-</span> <span class="fu">testing</span>(split_obj)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 25% sample of the data</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>train_sampl <span class="ot">&lt;-</span> <span class="fu">sample_n</span>(</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    full_train, <span class="fu">ceiling</span>(<span class="fu">nrow</span>(full_train) <span class="sc">*</span> <span class="fl">0.25</span>)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>test_sampl <span class="ot">&lt;-</span> <span class="fu">sample_n</span>(</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    full_test, <span class="fu">ceiling</span>(<span class="fu">nrow</span>(full_test) <span class="sc">*</span> <span class="fl">0.25</span>)</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>All features in this file may conceivably be helpful in predicting <code>DEFAULT</code> (originally named <code>TARGET</code>), with exception of <code>SK_ID_CURR</code>. Let’s remove such from our sample:</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>data_sampl <span class="ot">&lt;-</span> data_sampl <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="sc">-</span>SK_ID_CURR)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
+<p>All features in this file may conceivably be helpful in predicting <code>DEFAULT</code> (originally named <code>TARGET</code>) so we shouldn’t need to subset any of them.</p>
 </section>
 </section>
 <section id="penalized-regression" class="level1">
@@ -3224,11 +3349,18 @@ $ IMPUTED_EXT3                &lt;lgl&gt; FALSE, TRUE, FALSE, TRUE, TRUE, FALSE,
 <section id="prep-1" class="level2">
 <h2 class="anchored" data-anchor-id="prep-1">Prep</h2>
 <p>We have little to no way of knowing which will be predictive. Therefore, an elastic net is probably the best choice.</p>
-<p>Let’s prepare the data for penalized regression. <code>glmnet</code> requires split predictors and target, with the latter being in a vector and the former being cast as a matrix:</p>
+<p>Let’s prepare the data for penalized regression. <code>glmnet</code> requires split predictors and target, with the latter being in a vector and the former being cast as a matrix.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>target <span class="ot">&lt;-</span> data_sampl<span class="sc">$</span>DEFAULT</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>predictors <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    data_sampl <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="sc">-</span>DEFAULT)</span>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>train_target <span class="ot">&lt;-</span> train_sampl<span class="sc">$</span>DEFAULT</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>train_predictors <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    train_sampl <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="sc">-</span>DEFAULT)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>We’ll also do it for the test sample data.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>test_target <span class="ot">&lt;-</span> test_sampl<span class="sc">$</span>DEFAULT</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>test_predictors <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    test_sampl <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="sc">-</span>DEFAULT)</span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
@@ -3237,8 +3369,8 @@ $ IMPUTED_EXT3                &lt;lgl&gt; FALSE, TRUE, FALSE, TRUE, TRUE, FALSE,
 <p>Let’s run an elastic net model leveraging cross validation. We’ll use the default 10 folds. The output we get will measure <code>AUC</code> and the standard error thereof.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>mod1 <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> predictors, </span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> target, </span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> train_predictors, </span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> train_target, </span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">&quot;binomial&quot;</span>, </span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> <span class="fl">0.5</span>, </span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">type.measure =</span> <span class="st">&quot;auc&quot;</span></span>
@@ -3247,22 +3379,22 @@ $ IMPUTED_EXT3                &lt;lgl&gt; FALSE, TRUE, FALSE, TRUE, TRUE, FALSE,
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>mod1</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
-Call:  cv.glmnet(x = predictors, y = target, type.measure = &quot;auc&quot;, family = &quot;binomial&quot;,      alpha = 0.5) 
+Call:  cv.glmnet(x = train_predictors, y = train_target, type.measure = &quot;auc&quot;,      family = &quot;binomial&quot;, alpha = 0.5) 
 
 Measure: AUC 
 
-      Lambda Index Measure       SE Nonzero
-min 0.000102    73  0.7169 0.007021      28
-1se 0.010676    23  0.7100 0.006342       8</code></pre>
+       Lambda Index Measure       SE Nonzero
+min 0.0002293    78  0.7655 0.001077     166
+1se 0.0023471    53  0.7646 0.001041     124</code></pre>
 </div>
 </div>
-<p>Using an elastic net model, we’re achievingg an AUC of <code>~0.71</code> with a standard error of <code>0.006</code> with 8 variables.</p>
+<p>Using an elastic net model, we’re achievingg an AUC of <code>~0.76</code> with a standard error of <code>0.002</code> with 92 dummy variables.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(mod1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABUAAAAPACAMAAADDuCPrAAAA5FBMVEUAAAAAADoAAGYAOjoAOmYAOpAAZrY6AAA6ADo6OgA6Ojo6OmY6OpA6ZmY6ZpA6ZrY6kJA6kLY6kNtmAABmAGZmOgBmOjpmOpBmZjpmZmZmZpBmZrZmkLZmkNtmtttmtv+QOgCQOjqQZjqQZmaQZpCQkDqQkLaQtraQttuQtv+Q2/+pqam2ZgC2Zjq2kDq2kGa2kJC2tpC2tra2ttu227a229u22/+2///bkDrbkGbbtmbbtpDbtrbb25Db27bb29vb2//b/7bb////AAD/tmb/tpD/25D/27b/29v//7b//9v///8Uyf9yAAAACXBIWXMAAB2HAAAdhwGP5fFlAAAgAElEQVR4nO3da2PTyJ6gcRlCPCR7YA8sbLs3BzI5OwPbOJ3FTGh3YBImnU2C9P2/z6rkmyyXJdVfKrsuz+9NcLAlxa48kayLkwwAIJLsewEAwFcEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIQIKAEIEFACECCgACBFQABAioAAgREABQIiAAoAQAQUAIW8Dml4cJUny9MXX1beuz4ZJMih/x3gy02TNq/1OpvjWlfrW0bvbttPQTSY9XS3Me/lk5u6HBhPZPp2fr5/8YTIZzYO+vVUTPjF5bnSTMX2OxbOVPVD26nWY4T4euG2wNXsQ/Nr3x9eAXg0XQ+rl/DvpuXGvNicjLJ+lyWRFrGYO2sdmczI/Xwt+BTVLs5yYye/xlunkWTAP6NqDlmEZ/NZl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" class="img-fluid figure-img" width="672"></p>
+<p><img role="img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABUAAAAPACAMAAADDuCPrAAAA51BMVEUAAAAAADoAAGYAOjoAOmYAOpAAZrY6AAA6ADo6OgA6Ojo6OmY6OpA6ZmY6ZpA6ZrY6kJA6kLY6kNtmAABmAGZmOgBmOjpmOpBmZjpmZmZmZpBmZrZmkJBmkLZmkNtmtttmtv+QOgCQOjqQZgCQZjqQZmaQZpCQkDqQtraQttuQtv+Q2/+pqam2ZgC2Zjq2kDq2kGa2kJC2kLa2tpC2tra2ttu229u22/+2///bkDrbkGbbtmbbtpDbtrbb25Db27bb29vb2//b/7bb////AAD/tmb/tpD/25D/27b/29v//7b//9v///9KMaXJAAAACXBIWXMAAB2HAAAdhwGP5fFlAAAgAElEQVR4nO3d/WPTZr/YYaelZIWt7LSDPXk2Bpz17LQr4bA1pc1DO+hoRsD+//+eSX6LbMmW9bVs6Zav65cS11bkW/YnerM8mgAQMup6BgBSJaAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEECChAkoABBAgoQJKAAQQIKECSgAEFJBvTzd1/8dvfT+O2D0Wj04NmHLbcEJz5+MVp6Pr/t9yfZD18+DU27duK335+PRmff/Lr3xKvms7VhqbrlXWTON4zlx/PlgNQqP6nQAlr5lY2nsP6AqkW71fh1/iy+LA5faEBXl0nw1dR47mci417xvA/2qMNIMaDZAi68TLKX/sy93zbeEp345+/WX0rLF9fZT/vOeXnik7fzOT/7b/tO/G4+l2+B9oal4te9WjyTbxtNs3Is84HZ9Y1belKxBVT8lY2nUB7rikW71WK5j0aPFtOMDOja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" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3280,98 +3412,504 @@ min 0.000102    73  0.7169 0.007021      28
 <span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">Important_Flag =</span> <span class="fu">ifelse</span>(Coefficient <span class="sc">==</span> <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>)) <span class="sc">|&gt;</span></span>
 <span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">arrange</span>(<span class="fu">desc</span>(<span class="fu">abs</span>(Coefficient)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>                     Predictor   Coefficient Important_Flag
-1                 EXT_SOURCE_3 -2.188849e+00              1
-2                 EXT_SOURCE_2 -1.904802e+00              1
-3                 EXT_SOURCE_1 -1.210462e+00              1
-4                  (Intercept)  1.289310e-01              1
-5  REGION_RATING_CLIENT_W_CITY  1.417599e-02              1
-6     DEF_30_CNT_SOCIAL_CIRCLE  5.584345e-03              1
-7       DAYS_LAST_PHONE_CHANGE  9.029348e-06              1
-8              DAYS_ID_PUBLISH  6.256932e-06              1
-9                DAYS_EMPLOYED -1.337713e-07              1
-10                   CASH_LOAN  0.000000e+00              0
-11                 GENDER_MALE  0.000000e+00              0
-12                FLAG_OWN_CAR  0.000000e+00              0
-13             FLAG_OWN_REALTY  0.000000e+00              0
-14                CNT_CHILDREN  0.000000e+00              0
-15            AMT_INCOME_TOTAL  0.000000e+00              0
-16                  AMT_CREDIT  0.000000e+00              0
-17                 AMT_ANNUITY  0.000000e+00              0
-18             AMT_GOODS_PRICE  0.000000e+00              0
-19             NAME_TYPE_SUITE  0.000000e+00              0
-20            NAME_INCOME_TYPE  0.000000e+00              0
-21         NAME_EDUCATION_TYPE  0.000000e+00              0
-22          NAME_FAMILY_STATUS  0.000000e+00              0
-23           NAME_HOUSING_TYPE  0.000000e+00              0
-24  REGION_POPULATION_RELATIVE  0.000000e+00              0
-25                  DAYS_BIRTH  0.000000e+00              0
-26           DAYS_REGISTRATION  0.000000e+00              0
-27                 OWN_CAR_AGE  0.000000e+00              0
-28                  FLAG_MOBIL  0.000000e+00              0
-29              FLAG_EMP_PHONE  0.000000e+00              0
-30             FLAG_WORK_PHONE  0.000000e+00              0
-31            FLAG_CONT_MOBILE  0.000000e+00              0
-32                  FLAG_PHONE  0.000000e+00              0
-33                  FLAG_EMAIL  0.000000e+00              0
-34             OCCUPATION_TYPE  0.000000e+00              0
-35             CNT_FAM_MEMBERS  0.000000e+00              0
-36        REGION_RATING_CLIENT  0.000000e+00              0
-37  WEEKDAY_APPR_PROCESS_START  0.000000e+00              0
-38     HOUR_APPR_PROCESS_START  0.000000e+00              0
-39  REG_REGION_NOT_LIVE_REGION  0.000000e+00              0
-40  REG_REGION_NOT_WORK_REGION  0.000000e+00              0
-41 LIVE_REGION_NOT_WORK_REGION  0.000000e+00              0
-42      REG_CITY_NOT_LIVE_CITY  0.000000e+00              0
-43      REG_CITY_NOT_WORK_CITY  0.000000e+00              0
-44     LIVE_CITY_NOT_WORK_CITY  0.000000e+00              0
-45           ORGANIZATION_TYPE  0.000000e+00              0
-46    OBS_30_CNT_SOCIAL_CIRCLE  0.000000e+00              0
-47    OBS_60_CNT_SOCIAL_CIRCLE  0.000000e+00              0
-48    DEF_60_CNT_SOCIAL_CIRCLE  0.000000e+00              0
-49  AMT_REQ_CREDIT_BUREAU_HOUR  0.000000e+00              0
-50   AMT_REQ_CREDIT_BUREAU_DAY  0.000000e+00              0
-51  AMT_REQ_CREDIT_BUREAU_WEEK  0.000000e+00              0
-52   AMT_REQ_CREDIT_BUREAU_MON  0.000000e+00              0
-53   AMT_REQ_CREDIT_BUREAU_QRT  0.000000e+00              0
-54  AMT_REQ_CREDIT_BUREAU_YEAR  0.000000e+00              0
-55                IMPUTED_EXT1  0.000000e+00              0
-56                IMPUTED_EXT2  0.000000e+00              0
-57                IMPUTED_EXT3  0.000000e+00              0</code></pre>
+<pre><code>                                            Predictor   Coefficient
+1                                         (Intercept)  3.532973e+00
+2                                        EXT_SOURCE_3 -3.328217e+00
+3                                        EXT_SOURCE_2 -2.440205e+00
+4                         NAME_INCOME_TYPE.Unemployed  1.700417e+00
+5                                        EXT_SOURCE_1 -1.580913e+00
+6                            NAME_INCOME_TYPE.Student -1.050433e+00
+7                           ORGANIZATION_TYPE.Realtor  9.793680e-01
+8                 NAME_EDUCATION_TYPE.Academic.degree -9.391707e-01
+9                  ORGANIZATION_TYPE.Industry..type.5 -5.920880e-01
+10                ORGANIZATION_TYPE.Transport..type.3  5.838330e-01
+11                   ORGANIZATION_TYPE.Legal.Services  5.360799e-01
+12                 OCCUPATION_TYPE.Low.skill.Laborers  4.543564e-01
+13                         ORGANIZATION_TYPE.Military -4.502721e-01
+14                    NAME_TYPE_SUITE.Group.of.people  4.337982e-01
+15                 ORGANIZATION_TYPE.Industry..type.9 -4.162297e-01
+16                    ORGANIZATION_TYPE.Trade..type.2 -3.798490e-01
+17              ORGANIZATION_TYPE.Security.Ministries -3.638699e-01
+18                ORGANIZATION_TYPE.Transport..type.1 -3.561223e-01
+19                    ORGANIZATION_TYPE.Trade..type.6 -3.210172e-01
+20                           ORGANIZATION_TYPE.Police -3.125541e-01
+21                           OCCUPATION_TYPE.IT.staff -2.786280e-01
+22                ORGANIZATION_TYPE.Industry..type.12 -2.743194e-01
+23                             ORGANIZATION_TYPE.Bank -2.523596e-01
+24                    ORGANIZATION_TYPE.Trade..type.4 -2.432408e-01
+25                   NAME_INCOME_TYPE.Maternity.leave  2.323895e-01
+26                     ORGANIZATION_TYPE.Construction  2.300053e-01
+27                           ORGANIZATION_TYPE.Mobile  2.273055e-01
+28                                     IMPUTED_EXT2.N -2.231258e-01
+29                 ORGANIZATION_TYPE.Industry..type.2 -2.097668e-01
+30                                     FLAG_OWN_CAR.N  2.033758e-01
+31                         OCCUPATION_TYPE.Core.staff -2.019235e-01
+32                                     FLAG_OWN_CAR.Y -1.934463e-01
+33               NAME_EDUCATION_TYPE.Higher.education -1.933103e-01
+34                                     IMPUTED_EXT2.Y  1.926271e-01
+35              OCCUPATION_TYPE.Private.service.staff -1.882990e-01
+36                        ORGANIZATION_TYPE.Emergency -1.873505e-01
+37                 ORGANIZATION_TYPE.Industry..type.3  1.851995e-01
+38                    ORGANIZATION_TYPE.Self.employed  1.774471e-01
+39                        REGION_RATING_CLIENT_W_CITY  1.698267e-01
+40                       ORGANIZATION_TYPE.Restaurant  1.682775e-01
+41                                      GENDER_MALE.N -1.668034e-01
+42                                      GENDER_MALE.Y  1.632994e-01
+43                     OCCUPATION_TYPE.Medicine.staff -1.612532e-01
+44                         ORGANIZATION_TYPE.Cleaning  1.607989e-01
+45  NAME_EDUCATION_TYPE.Secondary...secondary.special  1.601284e-01
+46                                        CASH_LOAN.Y  1.562187e-01
+47                           DEF_30_CNT_SOCIAL_CIRCLE  1.554303e-01
+48                     NAME_INCOME_TYPE.State.servant -1.490702e-01
+49                                        CASH_LOAN.N -1.486173e-01
+50                            OCCUPATION_TYPE.Drivers  1.469576e-01
+51                         NAME_FAMILY_STATUS.Married -1.443223e-01
+52                NAME_EDUCATION_TYPE.Lower.secondary  1.429962e-01
+53                        OCCUPATION_TYPE.Accountants -1.416987e-01
+54                          AMT_REQ_CREDIT_BUREAU_DAY  1.271783e-01
+55                     OCCUPATION_TYPE.Security.staff  1.213192e-01
+56           ORGANIZATION_TYPE.Business.Entity.Type.1 -1.152365e-01
+57                                     IMPUTED_EXT1.N -1.100268e-01
+58                                     IMPUTED_EXT1.Y  1.073900e-01
+59                                     IMPUTED_EXT3.N -1.057261e-01
+60                                     IMPUTED_EXT3.Y  1.041181e-01
+61                    ORGANIZATION_TYPE.Trade..type.3  1.031059e-01
+62                           REG_CITY_NOT_LIVE_CITY.N -9.851101e-02
+63                 NAME_HOUSING_TYPE.Office.apartment -9.743842e-02
+64                           REG_CITY_NOT_LIVE_CITY.Y  9.487028e-02
+65                          AMT_REQ_CREDIT_BUREAU_QRT -9.074582e-02
+66                           OCCUPATION_TYPE.Managers -8.839256e-02
+67           ORGANIZATION_TYPE.Business.Entity.Type.3  7.908698e-02
+68              NAME_HOUSING_TYPE.Municipal.apartment  7.476591e-02
+69                           ORGANIZATION_TYPE.Postal  7.392358e-02
+70                       REG_REGION_NOT_LIVE_REGION.N  7.147059e-02
+71              OCCUPATION_TYPE.High.skill.tech.staff -6.999488e-02
+72                ORGANIZATION_TYPE.Transport..type.2 -6.846373e-02
+73                         ORGANIZATION_TYPE.Security -6.682691e-02
+74                 ORGANIZATION_TYPE.Industry..type.4  6.675468e-02
+75                           NAME_FAMILY_STATUS.Widow -6.634150e-02
+76                                  FLAG_WORK_PHONE.N -6.582503e-02
+77                           OCCUPATION_TYPE.Laborers  6.483334e-02
+78                      ORGANIZATION_TYPE.Electricity -6.147942e-02
+79                  WEEKDAY_APPR_PROCESS_START.MONDAY -6.109460e-02
+80                  WEEKDAY_APPR_PROCESS_START.SUNDAY -6.059389e-02
+81                WEEKDAY_APPR_PROCESS_START.SATURDAY -6.033814e-02
+82                 ORGANIZATION_TYPE.Industry..type.1  5.986108e-02
+83                         ORGANIZATION_TYPE.Religion -5.701555e-02
+84                       REG_REGION_NOT_LIVE_REGION.Y -5.628501e-02
+85                 NAME_HOUSING_TYPE.Rented.apartment  5.555295e-02
+86                                  FLAG_WORK_PHONE.Y  5.524999e-02
+87              NAME_INCOME_TYPE.Commercial.associate -5.471518e-02
+88                           ORGANIZATION_TYPE.School -4.939896e-02
+89                                       CNT_CHILDREN  4.809819e-02
+90                         AMT_REQ_CREDIT_BUREAU_WEEK -4.634270e-02
+91                        OCCUPATION_TYPE.Sales.staff  4.478986e-02
+92                           DEF_60_CNT_SOCIAL_CIRCLE  4.473631e-02
+93                          ORGANIZATION_TYPE.Housing -4.291177e-02
+94                           NAME_INCOME_TYPE.Working  4.098379e-02
+95                         ORGANIZATION_TYPE.Medicine -3.927555e-02
+96                                       FLAG_PHONE.N  3.743318e-02
+97                                       FLAG_PHONE.Y -3.621675e-02
+98                NAME_HOUSING_TYPE.House...apartment -3.229075e-02
+99                    NAME_TYPE_SUITE.Spouse..partner -3.082867e-02
+100                      NAME_FAMILY_STATUS.Separated  2.995004e-02
+101                WEEKDAY_APPR_PROCESS_START.TUESDAY  2.936577e-02
+102               ORGANIZATION_TYPE.Industry..type.11 -2.885678e-02
+103                          REG_CITY_NOT_WORK_CITY.N -2.730917e-02
+104                          REG_CITY_NOT_WORK_CITY.Y  2.610276e-02
+105                 NAME_HOUSING_TYPE.Co.op.apartment  2.295270e-02
+106                        ORGANIZATION_TYPE.Services -2.233410e-02
+107                         AMT_REQ_CREDIT_BUREAU_MON -2.198528e-02
+108                    OCCUPATION_TYPE.Cleaning.staff  2.136781e-02
+109                          NAME_TYPE_SUITE.Children -1.966768e-02
+110                               OCCUPATION_TYPE.XNA -1.889462e-02
+111                 NAME_FAMILY_STATUS.Civil.marriage  1.869274e-02
+112                                 FLAG_OWN_REALTY.N -1.296698e-02
+113                 WEEKDAY_APPR_PROCESS_START.FRIDAY  1.137110e-02
+114                                 FLAG_OWN_REALTY.Y  1.033040e-02
+115                     OCCUPATION_TYPE.Cooking.staff  9.017712e-03
+116                                       OWN_CAR_AGE  8.102332e-03
+117                           HOUR_APPR_PROCESS_START -4.670135e-03
+118                    ORGANIZATION_TYPE.Kindergarten -3.996302e-04
+119                            DAYS_LAST_PHONE_CHANGE  6.390872e-05
+120                                   DAYS_ID_PUBLISH  3.215159e-05
+121                                 DAYS_REGISTRATION  1.740589e-05
+122                                        DAYS_BIRTH  1.523334e-05
+123                                       AMT_ANNUITY  5.557808e-06
+124                                   AMT_GOODS_PRICE -7.107722e-07
+125                                        AMT_CREDIT  6.435503e-07
+126                                  AMT_INCOME_TOTAL  0.000000e+00
+127                            NAME_TYPE_SUITE.Family  0.000000e+00
+128                           NAME_TYPE_SUITE.Other_A  0.000000e+00
+129                           NAME_TYPE_SUITE.Other_B  0.000000e+00
+130                     NAME_TYPE_SUITE.Unaccompanied  0.000000e+00
+131                      NAME_INCOME_TYPE.Businessman  0.000000e+00
+132                        NAME_INCOME_TYPE.Pensioner  0.000000e+00
+133             NAME_EDUCATION_TYPE.Incomplete.higher  0.000000e+00
+134           NAME_FAMILY_STATUS.Single...not.married  0.000000e+00
+135                    NAME_HOUSING_TYPE.With.parents  0.000000e+00
+136                        REGION_POPULATION_RELATIVE  0.000000e+00
+137                                     DAYS_EMPLOYED  0.000000e+00
+138                                  FLAG_EMP_PHONE.N  0.000000e+00
+139                                  FLAG_EMP_PHONE.Y  0.000000e+00
+140                                FLAG_CONT_MOBILE.N  0.000000e+00
+141                                FLAG_CONT_MOBILE.Y  0.000000e+00
+142                                      FLAG_EMAIL.N  0.000000e+00
+143                                      FLAG_EMAIL.Y  0.000000e+00
+144                          OCCUPATION_TYPE.HR.staff  0.000000e+00
+145                     OCCUPATION_TYPE.Realty.agents  0.000000e+00
+146                       OCCUPATION_TYPE.Secretaries  0.000000e+00
+147              OCCUPATION_TYPE.Waiters.barmen.staff  0.000000e+00
+148                                   CNT_FAM_MEMBERS  0.000000e+00
+149                              REGION_RATING_CLIENT  0.000000e+00
+150               WEEKDAY_APPR_PROCESS_START.THURSDAY  0.000000e+00
+151              WEEKDAY_APPR_PROCESS_START.WEDNESDAY  0.000000e+00
+152                      REG_REGION_NOT_WORK_REGION.N  0.000000e+00
+153                      REG_REGION_NOT_WORK_REGION.Y  0.000000e+00
+154                     LIVE_REGION_NOT_WORK_REGION.N  0.000000e+00
+155                     LIVE_REGION_NOT_WORK_REGION.Y  0.000000e+00
+156                         LIVE_CITY_NOT_WORK_CITY.N  0.000000e+00
+157                         LIVE_CITY_NOT_WORK_CITY.Y  0.000000e+00
+158                     ORGANIZATION_TYPE.Advertising  0.000000e+00
+159                     ORGANIZATION_TYPE.Agriculture  0.000000e+00
+160          ORGANIZATION_TYPE.Business.Entity.Type.2  0.000000e+00
+161                         ORGANIZATION_TYPE.Culture  0.000000e+00
+162                      ORGANIZATION_TYPE.Government  0.000000e+00
+163                           ORGANIZATION_TYPE.Hotel  0.000000e+00
+164               ORGANIZATION_TYPE.Industry..type.10  0.000000e+00
+165               ORGANIZATION_TYPE.Industry..type.13  0.000000e+00
+166                ORGANIZATION_TYPE.Industry..type.6  0.000000e+00
+167                ORGANIZATION_TYPE.Industry..type.7  0.000000e+00
+168                ORGANIZATION_TYPE.Industry..type.8  0.000000e+00
+169                       ORGANIZATION_TYPE.Insurance  0.000000e+00
+170                           ORGANIZATION_TYPE.Other  0.000000e+00
+171                         ORGANIZATION_TYPE.Telecom  0.000000e+00
+172                   ORGANIZATION_TYPE.Trade..type.1  0.000000e+00
+173                   ORGANIZATION_TYPE.Trade..type.5  0.000000e+00
+174                   ORGANIZATION_TYPE.Trade..type.7  0.000000e+00
+175               ORGANIZATION_TYPE.Transport..type.4  0.000000e+00
+176                      ORGANIZATION_TYPE.University  0.000000e+00
+177                             ORGANIZATION_TYPE.XNA  0.000000e+00
+178                          OBS_30_CNT_SOCIAL_CIRCLE  0.000000e+00
+179                          OBS_60_CNT_SOCIAL_CIRCLE  0.000000e+00
+180                        AMT_REQ_CREDIT_BUREAU_HOUR  0.000000e+00
+181                        AMT_REQ_CREDIT_BUREAU_YEAR  0.000000e+00
+    Important_Flag
+1                1
+2                1
+3                1
+4                1
+5                1
+6                1
+7                1
+8                1
+9                1
+10               1
+11               1
+12               1
+13               1
+14               1
+15               1
+16               1
+17               1
+18               1
+19               1
+20               1
+21               1
+22               1
+23               1
+24               1
+25               1
+26               1
+27               1
+28               1
+29               1
+30               1
+31               1
+32               1
+33               1
+34               1
+35               1
+36               1
+37               1
+38               1
+39               1
+40               1
+41               1
+42               1
+43               1
+44               1
+45               1
+46               1
+47               1
+48               1
+49               1
+50               1
+51               1
+52               1
+53               1
+54               1
+55               1
+56               1
+57               1
+58               1
+59               1
+60               1
+61               1
+62               1
+63               1
+64               1
+65               1
+66               1
+67               1
+68               1
+69               1
+70               1
+71               1
+72               1
+73               1
+74               1
+75               1
+76               1
+77               1
+78               1
+79               1
+80               1
+81               1
+82               1
+83               1
+84               1
+85               1
+86               1
+87               1
+88               1
+89               1
+90               1
+91               1
+92               1
+93               1
+94               1
+95               1
+96               1
+97               1
+98               1
+99               1
+100              1
+101              1
+102              1
+103              1
+104              1
+105              1
+106              1
+107              1
+108              1
+109              1
+110              1
+111              1
+112              1
+113              1
+114              1
+115              1
+116              1
+117              1
+118              1
+119              1
+120              1
+121              1
+122              1
+123              1
+124              1
+125              1
+126              0
+127              0
+128              0
+129              0
+130              0
+131              0
+132              0
+133              0
+134              0
+135              0
+136              0
+137              0
+138              0
+139              0
+140              0
+141              0
+142              0
+143              0
+144              0
+145              0
+146              0
+147              0
+148              0
+149              0
+150              0
+151              0
+152              0
+153              0
+154              0
+155              0
+156              0
+157              0
+158              0
+159              0
+160              0
+161              0
+162              0
+163              0
+164              0
+165              0
+166              0
+167              0
+168              0
+169              0
+170              0
+171              0
+172              0
+173              0
+174              0
+175              0
+176              0
+177              0
+178              0
+179              0
+180              0
+181              0</code></pre>
 </div>
 </div>
 <p>The external source variables are highly important and predictive.</p>
+</section>
+<section id="saving-model-results" class="level2">
+<h2 class="anchored" data-anchor-id="saving-model-results">Saving model results</h2>
+<p>Let’s use the model we found to be the best and predict new probabilities of the classification.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>pred_probs <span class="ot">&lt;-</span> <span class="fu">predict</span>(mod1, <span class="at">newx =</span> test_predictors, <span class="at">s =</span> <span class="st">&#39;lambda.1se&#39;</span>, <span class="at">type =</span> <span class="st">&#39;response&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now, we need to find the ideal threshold for classification of the probabilities:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>roc_obj <span class="ot">&lt;-</span> <span class="fu">roc</span>(<span class="fu">ifelse</span>(test_target <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>), pred_probs)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>youden_index <span class="ot">&lt;-</span> roc_obj<span class="sc">$</span>sensitivities <span class="sc">+</span> roc_obj<span class="sc">$</span>specificities <span class="sc">-</span> <span class="dv">1</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>optimal_index <span class="ot">&lt;-</span> <span class="fu">which.max</span>(youden_index)</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>optimal_threshold <span class="ot">&lt;-</span> roc_obj<span class="sc">$</span>thresholds[optimal_index]</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>optimal_threshold</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.4280494</code></pre>
+</div>
+</div>
+<p>We can now use this optimal threshold for the confusion matrix:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>mat1 <span class="ot">&lt;-</span> <span class="fu">confusionMatrix</span>(</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">factor</span>(<span class="fu">ifelse</span>(pred_probs <span class="sc">&gt;</span> optimal_threshold, <span class="dv">1</span>, <span class="dv">0</span>), <span class="at">levels =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">0</span>)), </span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">factor</span>(<span class="fu">ifelse</span>(test_target <span class="sc">==</span> <span class="st">&quot;Y&quot;</span>, <span class="dv">1</span>, <span class="dv">0</span>), <span class="at">levels =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">0</span>))</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>mat1</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Confusion Matrix and Statistics
+
+          Reference
+Prediction     1     0
+         1 13538  6981
+         0  3526 10659
+                                          
+               Accuracy : 0.6972          
+                 95% CI : (0.6924, 0.7021)
+    No Information Rate : 0.5083          
+    P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+                                          
+                  Kappa : 0.3963          
+                                          
+ Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
+                                          
+            Sensitivity : 0.7934          
+            Specificity : 0.6043          
+         Pos Pred Value : 0.6598          
+         Neg Pred Value : 0.7514          
+             Prevalence : 0.4917          
+         Detection Rate : 0.3901          
+   Detection Prevalence : 0.5913          
+      Balanced Accuracy : 0.6988          
+                                          
+       &#39;Positive&#39; Class : 1               
+                                          </code></pre>
+</div>
+</div>
+<p>Let’s also grab the AUC value:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>auc1 <span class="ot">&lt;-</span> <span class="fu">auc</span>(roc_obj)</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>auc1</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Area under the curve: 0.762</code></pre>
+</div>
+</div>
+<p>Let’s compile all these metrics into a dataframe and save the results:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>performance <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;model&quot;</span> <span class="ot">=</span> <span class="st">&quot;Elastic Net&quot;</span>), </span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;hyperparameters&quot;</span> <span class="ot">=</span> <span class="fu">paste</span>(</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>        <span class="fu">paste</span>(<span class="st">&quot;Lambda:&quot;</span>, mod1<span class="sc">$</span>lambda<span class="fl">.1</span>se), </span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">paste</span>(<span class="st">&quot;Mix:&quot;</span>, <span class="fl">0.5</span>), </span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">paste</span>(<span class="st">&quot;Cutoff:&quot;</span>, optimal_threshold), </span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>        <span class="at">collapse =</span> <span class="st">&quot;, &quot;</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>    )), </span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    mat1<span class="sc">$</span>overall[<span class="fu">c</span>(<span class="st">&quot;Accuracy&quot;</span>)], </span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    mat1<span class="sc">$</span>byClass[<span class="fu">c</span>(<span class="st">&quot;Precision&quot;</span>, <span class="st">&quot;Recall&quot;</span>)], </span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">&quot;AUC&quot;</span> <span class="ot">=</span> auc1)</span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>performance</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                                                         model 
+                                                 &quot;Elastic Net&quot; 
+                                               hyperparameters 
+&quot;Lambda: 0.002347112488074 Mix: 0.5 Cutoff: 0.428049365448963&quot; 
+                                                      Accuracy 
+                                           &quot;0.697239511295528&quot; 
+                                                     Precision 
+                                           &quot;0.659778741654077&quot; 
+                                                        Recall 
+                                           &quot;0.793366150961088&quot; 
+                                                           AUC 
+                                           &quot;0.761974812975667&quot; </code></pre>
+</div>
+</div>
+<div class="cell" data-ignore="true">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">data.frame</span>(<span class="fu">as.list</span>(performance)) <span class="sc">|&gt;</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">write.csv</span>(<span class="st">&#39;models/penalized-regression/model-results.csv&#39;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
 </section>
 <section id="tuned-modeling" class="level2">
 <h2 class="anchored" data-anchor-id="tuned-modeling">Tuned Modeling</h2>
 <p>The above, basic model assumes a perfect 50-50 elastic net. It could be, however, a better tuned model could improve performance. We test a few different values of <code>alpha</code> (the elastic net mix) to see if we can do any better. We will reduce the number of folds to help it run faster:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>mix <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fl">0.2</span>, <span class="fl">0.8</span>, <span class="fl">0.2</span>)</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(m <span class="cf">in</span> mix) {</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    t_mod <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(</span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">x =</span> predictors, </span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>        <span class="at">y =</span> target, </span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>        <span class="at">family =</span> <span class="st">&quot;binomial&quot;</span>, </span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>        <span class="at">nfolds =</span> <span class="dv">3</span>, </span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>        <span class="at">alpha =</span> m, </span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>        <span class="at">type.measure =</span> <span class="st">&quot;auc&quot;</span></span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    results[[<span class="fu">length</span>(results) <span class="sc">+</span> <span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">c</span>(m, t_mod<span class="sc">$</span>cvm[t_mod<span class="sc">$</span>index])</span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>mix <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fl">0.2</span>, <span class="fl">0.8</span>, <span class="fl">0.2</span>)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(m <span class="cf">in</span> mix) {</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    t_mod <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">x =</span> train_predictors, </span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>        <span class="at">y =</span> train_target, </span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>        <span class="at">family =</span> <span class="st">&quot;binomial&quot;</span>, </span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>        <span class="at">nfolds =</span> <span class="dv">3</span>, </span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>        <span class="at">alpha =</span> m, </span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>        <span class="at">type.measure =</span> <span class="st">&quot;auc&quot;</span></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>    results[[<span class="fu">length</span>(results) <span class="sc">+</span> <span class="dv">1</span>]] <span class="ot">&lt;-</span> <span class="fu">c</span>(m, t_mod<span class="sc">$</span>cvm[t_mod<span class="sc">$</span>index])</span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>results_df <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">do.call</span>(rbind, results))</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(results_df) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;mix&quot;</span>, <span class="st">&quot;AUC_lambda.min&quot;</span>, <span class="st">&quot;AUC_lambda.1se&quot;</span>)</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>results_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>results_df <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">do.call</span>(rbind, results))</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(results_df) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;mix&quot;</span>, <span class="st">&quot;AUC_lambda.min&quot;</span>, <span class="st">&quot;AUC_lambda.1se&quot;</span>)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>results_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>  mix AUC_lambda.min AUC_lambda.1se
-1 0.2      0.7176267      0.7097944
-2 0.4      0.7160487      0.7128801
-3 0.6      0.7176139      0.7131730
-4 0.8      0.7163803      0.7108224</code></pre>
+1 0.2      0.7652886      0.7650394
+2 0.4      0.7654275      0.7638517
+3 0.6      0.7652099      0.7649984
+4 0.8      0.7650149      0.7636397</code></pre>
 </div>
 </div>
 <p>We aren’t achieving really any better or worse results with a weighted elastic net. The next step would be determining if some interaction terms could improve things.</p>
@@ -3390,372 +3928,460 @@ min 0.000102    73  0.7169 0.007021      28
 <li><code>EXT_SOURCE_#</code> and <code>IMPUTED_EXT#</code></li>
 </ol>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>alt_data_sampl <span class="ot">&lt;-</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    data_sampl <span class="sc">|&gt;</span></span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>        <span class="at">I_CHILDREN_X_CREDIT =</span> CNT_CHILDREN <span class="sc">*</span> AMT_CREDIT, </span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>        <span class="at">I_ANNUITY_X_CREDIT =</span> AMT_ANNUITY <span class="sc">*</span> AMT_CREDIT, </span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">I_PHONE_CHANGE_X_CREDIT_BUREAU_DAY =</span> DAYS_LAST_PHONE_CHANGE <span class="sc">*</span> AMT_REQ_CREDIT_BUREAU_DAY, </span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>        <span class="at">I_REGION_RATING_X_30_SOCIAL =</span> REGION_RATING_CLIENT_W_CITY <span class="sc">*</span> DEF_30_CNT_SOCIAL_CIRCLE, </span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>        <span class="at">I_BUREAU_DAY_X_CREDIT =</span> AMT_REQ_CREDIT_BUREAU_DAY <span class="sc">*</span> AMT_CREDIT, </span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>        <span class="at">I_CREDIT_X_GOODS =</span> AMT_CREDIT <span class="sc">*</span> AMT_GOODS_PRICE, </span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>        <span class="at">I_EXT1_X_IMP1 =</span> EXT_SOURCE_1 <span class="sc">*</span> IMPUTED_EXT1, </span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>        <span class="at">I_EXT2_X_IMP2 =</span> EXT_SOURCE_2 <span class="sc">*</span> IMPUTED_EXT2, </span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>        <span class="at">I_EXT3_X_IMP3 =</span> EXT_SOURCE_3 <span class="sc">*</span> IMPUTED_EXT3</span>
-<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>    )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>add_interactions <span class="ot">&lt;-</span> <span class="cf">function</span>(data) {</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    alt_data <span class="ot">&lt;-</span> </span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>        data <span class="sc">|&gt;</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>        <span class="fu">mutate</span>(</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">I_CHILDREN_X_CREDIT =</span> CNT_CHILDREN <span class="sc">*</span> AMT_CREDIT, </span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>            <span class="at">I_ANNUITY_X_CREDIT =</span> AMT_ANNUITY <span class="sc">*</span> AMT_CREDIT, </span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>            <span class="at">I_PHONE_CHANGE_X_CREDIT_BUREAU_DAY =</span> DAYS_LAST_PHONE_CHANGE <span class="sc">*</span> AMT_REQ_CREDIT_BUREAU_DAY, </span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>            <span class="at">I_REGION_RATING_X_30_SOCIAL =</span> REGION_RATING_CLIENT_W_CITY <span class="sc">*</span> DEF_30_CNT_SOCIAL_CIRCLE, </span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>            <span class="at">I_BUREAU_DAY_X_CREDIT =</span> AMT_REQ_CREDIT_BUREAU_DAY <span class="sc">*</span> AMT_CREDIT, </span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>            <span class="at">I_CREDIT_X_GOODS =</span> AMT_CREDIT <span class="sc">*</span> AMT_GOODS_PRICE, </span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>            <span class="at">I_EXT1_X_IMP1 =</span> EXT_SOURCE_1 <span class="sc">*</span> IMPUTED_EXT1.Y, </span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>            <span class="at">I_EXT2_X_IMP2 =</span> EXT_SOURCE_2 <span class="sc">*</span> IMPUTED_EXT2.Y, </span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>            <span class="at">I_EXT3_X_IMP3 =</span> EXT_SOURCE_3 <span class="sc">*</span> IMPUTED_EXT3.Y</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(alt_data)</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>alt_train_sampl <span class="ot">&lt;-</span> <span class="fu">add_interactions</span>(train_sampl)</span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>alt_test_sampl <span class="ot">&lt;-</span> <span class="fu">add_interactions</span>(test_sampl)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>predictors_alt <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    alt_data_sampl[,<span class="sc">-</span><span class="fu">which</span>(<span class="fu">names</span>(alt_data_sampl) <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;DEFAULT&quot;</span>, <span class="st">&quot;SK_ID_CURR&quot;</span>))]</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>alt_train_predictors <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    alt_train_sampl[,<span class="sc">-</span><span class="fu">which</span>(<span class="fu">names</span>(alt_train_sampl) <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;DEFAULT&quot;</span>))]</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Let’s now use the interaction variables in another cross validated model:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>mod2 <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> predictors_alt, </span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> target, </span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">&quot;binomial&quot;</span>, </span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> <span class="fl">0.5</span>, </span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">type.measure =</span> <span class="st">&quot;auc&quot;</span></span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>mod2</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>mod2 <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> alt_train_predictors, </span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> train_target, </span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">&quot;binomial&quot;</span>, </span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> <span class="fl">0.5</span>, </span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">type.measure =</span> <span class="st">&quot;auc&quot;</span></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>mod2</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
-Call:  cv.glmnet(x = predictors_alt, y = target, type.measure = &quot;auc&quot;,      family = &quot;binomial&quot;, alpha = 0.5) 
+Call:  cv.glmnet(x = alt_train_predictors, y = train_target, type.measure = &quot;auc&quot;,      family = &quot;binomial&quot;, alpha = 0.5) 
 
 Measure: AUC 
 
-      Lambda Index Measure       SE Nonzero
-min 0.000178    67  0.7217 0.005335      35
-1se 0.004211    33  0.7164 0.004487      17</code></pre>
+       Lambda Index Measure       SE Nonzero
+min 0.0001196    85  0.7834 0.001855     176
+1se 0.0004398    71  0.7817 0.001859     165</code></pre>
 </div>
 </div>
-<p>The model really hasn’t improved at all with inclusion of these interactions, thought the model is now more complex and suceptible to more variance.</p>
+<p>The model has improved AUC a touch and decreased the standard error. However, it’s drastically increased the complexity of the model by nearly double. Probably not what is wanted.</p>
 <p>Let’s see if any of these interactions show up as important predictors:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>coef <span class="ot">&lt;-</span> <span class="fu">coef</span>(mod2, <span class="st">&quot;lambda.1se&quot;</span>)</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>coef_df <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">as.matrix</span>(coef))</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>coef_df<span class="sc">$</span>Predictor <span class="ot">&lt;-</span> <span class="fu">rownames</span>(coef)</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(coef_df)[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="st">&quot;Coefficient&quot;</span></span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(coef_df) <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>coef_df <span class="sc">|&gt;</span></span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(Predictor, Coefficient) <span class="sc">|&gt;</span></span>
-<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">Important_Flag =</span> <span class="fu">ifelse</span>(Coefficient <span class="sc">==</span> <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">arrange</span>(<span class="fu">desc</span>(<span class="fu">abs</span>(Coefficient)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>coef <span class="ot">&lt;-</span> <span class="fu">coef</span>(mod2, <span class="st">&quot;lambda.1se&quot;</span>)</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>coef_df <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">as.matrix</span>(coef))</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>coef_df<span class="sc">$</span>Predictor <span class="ot">&lt;-</span> <span class="fu">rownames</span>(coef)</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(coef_df)[<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="st">&quot;Coefficient&quot;</span></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(coef_df) <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>coef_df <span class="sc">|&gt;</span></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(Predictor, Coefficient) <span class="sc">|&gt;</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">Important_Flag =</span> <span class="fu">ifelse</span>(Coefficient <span class="sc">==</span> <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">arrange</span>(<span class="fu">desc</span>(<span class="fu">abs</span>(Coefficient)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>                            Predictor   Coefficient Important_Flag
-1                        EXT_SOURCE_3 -2.546274e+00              1
-2                        EXT_SOURCE_2 -1.999804e+00              1
-3                        EXT_SOURCE_1 -1.580184e+00              1
-4                       I_EXT1_X_IMP1  4.450122e-01              1
-5                         (Intercept)  3.252794e-01              1
-6                       I_EXT3_X_IMP3  3.071568e-01              1
-7          REGION_POPULATION_RELATIVE -1.967365e-01              1
-8         REGION_RATING_CLIENT_W_CITY  7.154179e-02              1
-9         I_REGION_RATING_X_30_SOCIAL  4.527066e-02              1
-10                       CNT_CHILDREN  2.283422e-02              1
-11         AMT_REQ_CREDIT_BUREAU_YEAR  6.687404e-03              1
-12           OBS_30_CNT_SOCIAL_CIRCLE  3.049338e-03              1
-13             DAYS_LAST_PHONE_CHANGE  3.565224e-05              1
-14                    DAYS_ID_PUBLISH  1.862556e-05              1
-15                      DAYS_EMPLOYED -5.479939e-07              1
-16                   AMT_INCOME_TOTAL -3.286553e-07              1
-17                        AMT_ANNUITY  4.783366e-08              1
-18                   I_CREDIT_X_GOODS -1.319238e-14              1
-19                          CASH_LOAN  0.000000e+00              0
-20                        GENDER_MALE  0.000000e+00              0
-21                       FLAG_OWN_CAR  0.000000e+00              0
-22                    FLAG_OWN_REALTY  0.000000e+00              0
-23                         AMT_CREDIT  0.000000e+00              0
-24                    AMT_GOODS_PRICE  0.000000e+00              0
-25                    NAME_TYPE_SUITE  0.000000e+00              0
-26                   NAME_INCOME_TYPE  0.000000e+00              0
-27                NAME_EDUCATION_TYPE  0.000000e+00              0
-28                 NAME_FAMILY_STATUS  0.000000e+00              0
-29                  NAME_HOUSING_TYPE  0.000000e+00              0
-30                         DAYS_BIRTH  0.000000e+00              0
-31                  DAYS_REGISTRATION  0.000000e+00              0
-32                        OWN_CAR_AGE  0.000000e+00              0
-33                         FLAG_MOBIL  0.000000e+00              0
-34                     FLAG_EMP_PHONE  0.000000e+00              0
-35                    FLAG_WORK_PHONE  0.000000e+00              0
-36                   FLAG_CONT_MOBILE  0.000000e+00              0
-37                         FLAG_PHONE  0.000000e+00              0
-38                         FLAG_EMAIL  0.000000e+00              0
-39                    OCCUPATION_TYPE  0.000000e+00              0
-40                    CNT_FAM_MEMBERS  0.000000e+00              0
-41               REGION_RATING_CLIENT  0.000000e+00              0
-42         WEEKDAY_APPR_PROCESS_START  0.000000e+00              0
-43            HOUR_APPR_PROCESS_START  0.000000e+00              0
-44         REG_REGION_NOT_LIVE_REGION  0.000000e+00              0
-45         REG_REGION_NOT_WORK_REGION  0.000000e+00              0
-46        LIVE_REGION_NOT_WORK_REGION  0.000000e+00              0
-47             REG_CITY_NOT_LIVE_CITY  0.000000e+00              0
-48             REG_CITY_NOT_WORK_CITY  0.000000e+00              0
-49            LIVE_CITY_NOT_WORK_CITY  0.000000e+00              0
-50                  ORGANIZATION_TYPE  0.000000e+00              0
-51           DEF_30_CNT_SOCIAL_CIRCLE  0.000000e+00              0
-52           OBS_60_CNT_SOCIAL_CIRCLE  0.000000e+00              0
-53           DEF_60_CNT_SOCIAL_CIRCLE  0.000000e+00              0
-54         AMT_REQ_CREDIT_BUREAU_HOUR  0.000000e+00              0
-55          AMT_REQ_CREDIT_BUREAU_DAY  0.000000e+00              0
-56         AMT_REQ_CREDIT_BUREAU_WEEK  0.000000e+00              0
-57          AMT_REQ_CREDIT_BUREAU_MON  0.000000e+00              0
-58          AMT_REQ_CREDIT_BUREAU_QRT  0.000000e+00              0
-59                       IMPUTED_EXT1  0.000000e+00              0
-60                       IMPUTED_EXT2  0.000000e+00              0
-61                       IMPUTED_EXT3  0.000000e+00              0
-62                I_CHILDREN_X_CREDIT  0.000000e+00              0
-63                 I_ANNUITY_X_CREDIT  0.000000e+00              0
-64 I_PHONE_CHANGE_X_CREDIT_BUREAU_DAY  0.000000e+00              0
-65              I_BUREAU_DAY_X_CREDIT  0.000000e+00              0
-66                      I_EXT2_X_IMP2  0.000000e+00              0</code></pre>
+<pre><code>                                            Predictor   Coefficient
+1                                       I_EXT3_X_IMP3 -1.528889e+01
+2                                         (Intercept)  1.375993e+01
+3                                       I_EXT1_X_IMP1 -1.110790e+01
+4                                       I_EXT2_X_IMP2 -8.576275e+00
+5                                      IMPUTED_EXT3.N -4.591983e+00
+6                                      IMPUTED_EXT3.Y  3.704059e+00
+7                                      IMPUTED_EXT2.N -3.624469e+00
+8                                      IMPUTED_EXT1.N -3.195336e+00
+9                                        EXT_SOURCE_3 -3.055277e+00
+10                           NAME_INCOME_TYPE.Student -2.792424e+00
+11                                     IMPUTED_EXT1.Y  2.576911e+00
+12                        NAME_INCOME_TYPE.Unemployed  2.412100e+00
+13                                       EXT_SOURCE_2 -2.399968e+00
+14                                     IMPUTED_EXT2.Y  1.600262e+00
+15                   NAME_INCOME_TYPE.Maternity.leave  1.445417e+00
+16                NAME_EDUCATION_TYPE.Academic.degree -1.223774e+00
+17                          ORGANIZATION_TYPE.Realtor  1.173096e+00
+18                                       EXT_SOURCE_1 -1.088912e+00
+19                       NAME_INCOME_TYPE.Businessman -8.234895e-01
+20                   ORGANIZATION_TYPE.Legal.Services  7.208582e-01
+21                 ORGANIZATION_TYPE.Industry..type.5 -6.981610e-01
+22                ORGANIZATION_TYPE.Transport..type.3  6.345650e-01
+23                    NAME_TYPE_SUITE.Group.of.people  6.109301e-01
+24                    ORGANIZATION_TYPE.Trade..type.4 -5.852989e-01
+25                ORGANIZATION_TYPE.Transport..type.1 -5.815638e-01
+26                         ORGANIZATION_TYPE.Military -4.990645e-01
+27                 OCCUPATION_TYPE.Low.skill.Laborers  4.780323e-01
+28                    ORGANIZATION_TYPE.Trade..type.6 -4.615526e-01
+29                 ORGANIZATION_TYPE.Industry..type.9 -4.571582e-01
+30                           ORGANIZATION_TYPE.Mobile  4.538192e-01
+31              ORGANIZATION_TYPE.Security.Ministries -4.303846e-01
+32                    ORGANIZATION_TYPE.Trade..type.2 -4.232685e-01
+33                ORGANIZATION_TYPE.Industry..type.12 -4.097099e-01
+34                           OCCUPATION_TYPE.IT.staff -3.945385e-01
+35                           ORGANIZATION_TYPE.Police -3.652062e-01
+36                         ORGANIZATION_TYPE.Cleaning  3.494770e-01
+37                 ORGANIZATION_TYPE.Industry..type.2 -3.383467e-01
+38                             ORGANIZATION_TYPE.Bank -3.046893e-01
+39                         ORGANIZATION_TYPE.Religion -2.909659e-01
+40                        ORGANIZATION_TYPE.Emergency -2.804705e-01
+41                 ORGANIZATION_TYPE.Industry..type.6 -2.741116e-01
+42                     ORGANIZATION_TYPE.Construction  2.595581e-01
+43                        REGION_RATING_CLIENT_W_CITY  2.586392e-01
+44                         REGION_POPULATION_RELATIVE  2.316930e-01
+45                 ORGANIZATION_TYPE.Industry..type.3  2.251561e-01
+46                          AMT_REQ_CREDIT_BUREAU_DAY  2.166025e-01
+47                                     FLAG_OWN_CAR.N  2.109498e-01
+48                                     FLAG_OWN_CAR.Y -2.094914e-01
+49              OCCUPATION_TYPE.Private.service.staff -2.044144e-01
+50                       ORGANIZATION_TYPE.Restaurant  1.921155e-01
+51                     OCCUPATION_TYPE.Security.staff  1.909153e-01
+52                         OCCUPATION_TYPE.Core.staff -1.902491e-01
+53                    ORGANIZATION_TYPE.Self.employed  1.834250e-01
+54                NAME_EDUCATION_TYPE.Lower.secondary  1.765198e-01
+55  NAME_EDUCATION_TYPE.Secondary...secondary.special  1.739882e-01
+56                                      GENDER_MALE.N -1.717073e-01
+57                                      GENDER_MALE.Y  1.707808e-01
+58                         ORGANIZATION_TYPE.Security -1.686329e-01
+59                            OCCUPATION_TYPE.Drivers  1.639389e-01
+60                     OCCUPATION_TYPE.Medicine.staff -1.602759e-01
+61                           OCCUPATION_TYPE.HR.staff  1.591153e-01
+62                           DEF_30_CNT_SOCIAL_CIRCLE  1.563523e-01
+63               NAME_EDUCATION_TYPE.Higher.education -1.558138e-01
+64                         NAME_FAMILY_STATUS.Married -1.551475e-01
+65                        OCCUPATION_TYPE.Accountants -1.549006e-01
+66                 ORGANIZATION_TYPE.Industry..type.1  1.454340e-01
+67           ORGANIZATION_TYPE.Business.Entity.Type.1 -1.422452e-01
+68                 ORGANIZATION_TYPE.Industry..type.4  1.383667e-01
+69                           ORGANIZATION_TYPE.Postal  1.372528e-01
+70                    ORGANIZATION_TYPE.Trade..type.3  1.277188e-01
+71                        OCCUPATION_TYPE.Secretaries  1.254356e-01
+72                      ORGANIZATION_TYPE.Electricity -1.227910e-01
+73                ORGANIZATION_TYPE.Transport..type.2 -1.144199e-01
+74                          ORGANIZATION_TYPE.Housing -1.106148e-01
+75                    ORGANIZATION_TYPE.Trade..type.1  1.082446e-01
+76                           NAME_INCOME_TYPE.Working  1.052300e-01
+77                 NAME_HOUSING_TYPE.Office.apartment -1.042943e-01
+78                                        CASH_LOAN.Y  1.010982e-01
+79                 NAME_HOUSING_TYPE.Rented.apartment  1.008204e-01
+80              NAME_HOUSING_TYPE.Municipal.apartment  1.007539e-01
+81                          AMT_REQ_CREDIT_BUREAU_QRT -9.825317e-02
+82                           REG_CITY_NOT_LIVE_CITY.N -9.747794e-02
+83                           REG_CITY_NOT_LIVE_CITY.Y  9.743638e-02
+84                          ORGANIZATION_TYPE.Culture  9.596025e-02
+85                           ORGANIZATION_TYPE.School -9.566730e-02
+86                                        CASH_LOAN.N -9.404510e-02
+87                       REG_REGION_NOT_LIVE_REGION.N  9.296861e-02
+88                     OCCUPATION_TYPE.Cleaning.staff  9.203428e-02
+89                           OCCUPATION_TYPE.Managers -8.959269e-02
+90                       REG_REGION_NOT_LIVE_REGION.Y -8.907418e-02
+91           ORGANIZATION_TYPE.Business.Entity.Type.3  8.837468e-02
+92                                  FLAG_WORK_PHONE.N -8.780171e-02
+93                         ORGANIZATION_TYPE.Services -8.570895e-02
+94                           NAME_FAMILY_STATUS.Widow -8.472409e-02
+95                                  FLAG_WORK_PHONE.Y  8.419445e-02
+96                               REGION_RATING_CLIENT -8.166804e-02
+97              OCCUPATION_TYPE.High.skill.tech.staff -8.124010e-02
+98                     NAME_INCOME_TYPE.State.servant -8.000448e-02
+99                         AMT_REQ_CREDIT_BUREAU_WEEK -7.937564e-02
+100                 NAME_HOUSING_TYPE.Co.op.apartment  7.728171e-02
+101                          NAME_TYPE_SUITE.Children -7.409382e-02
+102                          OCCUPATION_TYPE.Laborers  7.375717e-02
+103               WEEKDAY_APPR_PROCESS_START.SATURDAY -7.182034e-02
+104                 WEEKDAY_APPR_PROCESS_START.SUNDAY -7.055514e-02
+105                                FLAG_CONT_MOBILE.N  6.510510e-02
+106                           ORGANIZATION_TYPE.Hotel -6.495363e-02
+107                 WEEKDAY_APPR_PROCESS_START.MONDAY -6.437031e-02
+108                           NAME_TYPE_SUITE.Other_A -6.370491e-02
+109                       OCCUPATION_TYPE.Sales.staff  6.077562e-02
+110                        ORGANIZATION_TYPE.Medicine -6.022675e-02
+111               ORGANIZATION_TYPE.Industry..type.10  6.011791e-02
+112                   NAME_TYPE_SUITE.Spouse..partner -5.941819e-02
+113                                      CNT_CHILDREN  5.844177e-02
+114                                FLAG_CONT_MOBILE.Y -5.544720e-02
+115                          DEF_60_CNT_SOCIAL_CIRCLE  5.452353e-02
+116                WEEKDAY_APPR_PROCESS_START.TUESDAY  5.119699e-02
+117                      NAME_FAMILY_STATUS.Separated  5.064683e-02
+118               ORGANIZATION_TYPE.Industry..type.11 -4.896470e-02
+119                     OCCUPATION_TYPE.Cooking.staff  4.145144e-02
+120                                      FLAG_PHONE.N  4.015386e-02
+121                                      FLAG_PHONE.Y -3.969318e-02
+122                        AMT_REQ_CREDIT_BUREAU_HOUR -3.439327e-02
+123                    ORGANIZATION_TYPE.Kindergarten -3.306421e-02
+124                               OCCUPATION_TYPE.XNA -3.237406e-02
+125                 WEEKDAY_APPR_PROCESS_START.FRIDAY  3.092718e-02
+126                     ORGANIZATION_TYPE.Agriculture  3.032133e-02
+127                          REG_CITY_NOT_WORK_CITY.N -2.901355e-02
+128                          REG_CITY_NOT_WORK_CITY.Y  2.889684e-02
+129                       ORGANIZATION_TYPE.Insurance -2.868275e-02
+130               NAME_HOUSING_TYPE.House...apartment -2.623315e-02
+131                         AMT_REQ_CREDIT_BUREAU_MON -2.579244e-02
+132                ORGANIZATION_TYPE.Industry..type.8 -2.279904e-02
+133                 NAME_FAMILY_STATUS.Civil.marriage  2.043056e-02
+134              OCCUPATION_TYPE.Waiters.barmen.staff  1.827983e-02
+135                                 FLAG_OWN_REALTY.N -1.539554e-02
+136                                 FLAG_OWN_REALTY.Y  1.520742e-02
+137              WEEKDAY_APPR_PROCESS_START.WEDNESDAY  1.514343e-02
+138                      ORGANIZATION_TYPE.University  1.092346e-02
+139                                       OWN_CAR_AGE  9.360714e-03
+140          ORGANIZATION_TYPE.Business.Entity.Type.2  8.027964e-03
+141                   ORGANIZATION_TYPE.Trade..type.7  6.660998e-03
+142                           HOUR_APPR_PROCESS_START -4.934847e-03
+143                           ORGANIZATION_TYPE.Other  4.932404e-03
+144                     LIVE_REGION_NOT_WORK_REGION.N -4.255084e-03
+145                        AMT_REQ_CREDIT_BUREAU_YEAR  3.402660e-03
+146                                      FLAG_EMAIL.N  3.045619e-03
+147                   ORGANIZATION_TYPE.Trade..type.5 -3.025815e-03
+148                         ORGANIZATION_TYPE.Telecom -2.636656e-03
+149                     LIVE_REGION_NOT_WORK_REGION.Y  2.237436e-03
+150                                      FLAG_EMAIL.Y -2.097862e-03
+151                           NAME_TYPE_SUITE.Other_B  9.427455e-04
+152                          OBS_30_CNT_SOCIAL_CIRCLE  6.799077e-04
+153                            DAYS_LAST_PHONE_CHANGE  6.467428e-05
+154                I_PHONE_CHANGE_X_CREDIT_BUREAU_DAY  3.415919e-05
+155                                   DAYS_ID_PUBLISH  3.362819e-05
+156                                 DAYS_REGISTRATION  1.781073e-05
+157                                        DAYS_BIRTH  1.489616e-05
+158                                       AMT_ANNUITY  1.434204e-05
+159                                        AMT_CREDIT  2.053306e-06
+160                                   AMT_GOODS_PRICE -1.800457e-06
+161                                     DAYS_EMPLOYED  4.912155e-07
+162                             I_BUREAU_DAY_X_CREDIT  5.910048e-08
+163                                  AMT_INCOME_TOTAL  2.161212e-08
+164                               I_CHILDREN_X_CREDIT -1.652219e-08
+165                                I_ANNUITY_X_CREDIT -1.165911e-11
+166                                  I_CREDIT_X_GOODS  1.062839e-14
+167                            NAME_TYPE_SUITE.Family  0.000000e+00
+168                     NAME_TYPE_SUITE.Unaccompanied  0.000000e+00
+169             NAME_INCOME_TYPE.Commercial.associate  0.000000e+00
+170                        NAME_INCOME_TYPE.Pensioner  0.000000e+00
+171             NAME_EDUCATION_TYPE.Incomplete.higher  0.000000e+00
+172           NAME_FAMILY_STATUS.Single...not.married  0.000000e+00
+173                    NAME_HOUSING_TYPE.With.parents  0.000000e+00
+174                                  FLAG_EMP_PHONE.N  0.000000e+00
+175                                  FLAG_EMP_PHONE.Y  0.000000e+00
+176                     OCCUPATION_TYPE.Realty.agents  0.000000e+00
+177                                   CNT_FAM_MEMBERS  0.000000e+00
+178               WEEKDAY_APPR_PROCESS_START.THURSDAY  0.000000e+00
+179                      REG_REGION_NOT_WORK_REGION.N  0.000000e+00
+180                      REG_REGION_NOT_WORK_REGION.Y  0.000000e+00
+181                         LIVE_CITY_NOT_WORK_CITY.N  0.000000e+00
+182                         LIVE_CITY_NOT_WORK_CITY.Y  0.000000e+00
+183                     ORGANIZATION_TYPE.Advertising  0.000000e+00
+184                      ORGANIZATION_TYPE.Government  0.000000e+00
+185               ORGANIZATION_TYPE.Industry..type.13  0.000000e+00
+186                ORGANIZATION_TYPE.Industry..type.7  0.000000e+00
+187               ORGANIZATION_TYPE.Transport..type.4  0.000000e+00
+188                             ORGANIZATION_TYPE.XNA  0.000000e+00
+189                          OBS_60_CNT_SOCIAL_CIRCLE  0.000000e+00
+190                       I_REGION_RATING_X_30_SOCIAL  0.000000e+00
+    Important_Flag
+1                1
+2                1
+3                1
+4                1
+5                1
+6                1
+7                1
+8                1
+9                1
+10               1
+11               1
+12               1
+13               1
+14               1
+15               1
+16               1
+17               1
+18               1
+19               1
+20               1
+21               1
+22               1
+23               1
+24               1
+25               1
+26               1
+27               1
+28               1
+29               1
+30               1
+31               1
+32               1
+33               1
+34               1
+35               1
+36               1
+37               1
+38               1
+39               1
+40               1
+41               1
+42               1
+43               1
+44               1
+45               1
+46               1
+47               1
+48               1
+49               1
+50               1
+51               1
+52               1
+53               1
+54               1
+55               1
+56               1
+57               1
+58               1
+59               1
+60               1
+61               1
+62               1
+63               1
+64               1
+65               1
+66               1
+67               1
+68               1
+69               1
+70               1
+71               1
+72               1
+73               1
+74               1
+75               1
+76               1
+77               1
+78               1
+79               1
+80               1
+81               1
+82               1
+83               1
+84               1
+85               1
+86               1
+87               1
+88               1
+89               1
+90               1
+91               1
+92               1
+93               1
+94               1
+95               1
+96               1
+97               1
+98               1
+99               1
+100              1
+101              1
+102              1
+103              1
+104              1
+105              1
+106              1
+107              1
+108              1
+109              1
+110              1
+111              1
+112              1
+113              1
+114              1
+115              1
+116              1
+117              1
+118              1
+119              1
+120              1
+121              1
+122              1
+123              1
+124              1
+125              1
+126              1
+127              1
+128              1
+129              1
+130              1
+131              1
+132              1
+133              1
+134              1
+135              1
+136              1
+137              1
+138              1
+139              1
+140              1
+141              1
+142              1
+143              1
+144              1
+145              1
+146              1
+147              1
+148              1
+149              1
+150              1
+151              1
+152              1
+153              1
+154              1
+155              1
+156              1
+157              1
+158              1
+159              1
+160              1
+161              1
+162              1
+163              1
+164              1
+165              1
+166              1
+167              0
+168              0
+169              0
+170              0
+171              0
+172              0
+173              0
+174              0
+175              0
+176              0
+177              0
+178              0
+179              0
+180              0
+181              0
+182              0
+183              0
+184              0
+185              0
+186              0
+187              0
+188              0
+189              0
+190              0</code></pre>
 </div>
 </div>
 <p>It looks as if the following were helpful predictors (though AUC was not improved):</p>
 <ul>
 <li>The interactions between external source and their imputed flags are very high; we’d expect to see this and its important they do so</li>
-<li><code>REGION_RATING_CLIENT_W_CITY</code> and <code>DEF_30_CNT_SOCIAL_CIRCLE</code>; a client’s neighborhood and social circle behavior is contributing</li>
-<li><code>AMT_CREDIT</code> and <code>AMT_GOODS_PRICE</code>; what is given for credit and the price thereof is an important, varying relationship</li>
+<li>Others show up throughout but aren’t extremely notable</li>
 </ul>
 </section>
 <section id="conclusion" class="level2">
 <h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
-<p>There’s too many unique relationships to explore for an optimal model in the OLS family, even with the penalized regression flavor. We’re likely tapped-out with an AUC of <strong>~0.71</strong>.</p>
-</section>
-</section>
-<section id="support-vector-classifier" class="level1">
-<h1>Support Vector Classifier</h1>
-<section id="prep-2" class="level2">
-<h2 class="anchored" data-anchor-id="prep-2">Prep</h2>
-<p>A suport vector machine could be a good approach due to the nature of the problem and data:</p>
-<ul>
-<li>Many features</li>
-<li>Capturing some non-linear relationships</li>
-<li>Robustness to overfitting</li>
-<li>Binary classification</li>
-</ul>
-<p>Lets get the data ready:</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 3% sample of the data</span></span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>data_sampl <span class="ot">&lt;-</span> <span class="fu">sample_n</span>(</span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    data, </span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ceiling</span>(<span class="fu">nrow</span>(data) <span class="sc">*</span> <span class="fl">0.03</span>)</span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
-<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
-<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>        <span class="fu">across</span>(<span class="fu">where</span>(is.character), <span class="sc">~</span><span class="fu">make.names</span>(.)), </span>
-<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>        <span class="fu">across</span>(<span class="fu">where</span>(is.logical), <span class="sc">~</span><span class="fu">factor</span>(<span class="fu">ifelse</span>(.,<span class="st">&quot;Y&quot;</span>,<span class="st">&quot;N&quot;</span>)))</span>
-<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">|&gt;</span></span>
-<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(SK_ID_CURR, FLAG_MOBIL))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>fitControl <span class="ot">&lt;-</span> <span class="fu">trainControl</span>(</span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;repeatedcv&quot;</span>, </span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">number =</span> <span class="dv">5</span>, </span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">repeats =</span> <span class="dv">2</span>, </span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">classProbs =</span> <span class="cn">TRUE</span>, </span>
-<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">summaryFunction =</span> twoClassSummary, </span>
-<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">savePredictions =</span> <span class="cn">TRUE</span></span>
-<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>fitGrid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
-<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">sigma =</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.05</span>), </span>
-<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">C =</span> <span class="fu">c</span>(<span class="fl">0.01</span>, <span class="fl">0.5</span>, <span class="dv">1</span>, <span class="dv">5</span>, <span class="dv">10</span>)</span>
-<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-</section>
-<section id="basic-modeling-1" class="level2">
-<h2 class="anchored" data-anchor-id="basic-modeling-1">Basic Modeling</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>mod03 <span class="ot">&lt;-</span> <span class="fu">train</span>(</span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    DEFAULT <span class="sc">~</span> ., </span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> data_sampl, </span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">&quot;svmRadial&quot;</span>, </span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">trControl =</span> fitControl, </span>
-<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">metric =</span> <span class="st">&quot;ROC&quot;</span>,  <span class="co"># Use ROC for AUC</span></span>
-<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">tuneGrid =</span> fitGrid</span>
-<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.271792e-05 -3.124897e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.326539e-05 -4.84914e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.929591e-05 -4.119548e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -3.828851e-05 -3.657031e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -5.947566e-05 -5.415066e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>maximum number of iterations reached -4.856521e-05 -4.059094e-05</code></pre>
-</div>
-<div class="sourceCode cell-code" id="cb72"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a>mod03</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Support Vector Machines with Radial Basis Function Kernel 
-
-9217 samples
-  55 predictor
-   2 classes: &#39;N&#39;, &#39;Y&#39; 
-
-No pre-processing
-Resampling: Cross-Validated (5 fold, repeated 2 times) 
-Summary of sample sizes: 7374, 7374, 7373, 7374, 7373, 7373, ... 
-Resampling results across tuning parameters:
-
-  sigma  C      ROC        Sens       Spec        
-  0.01    0.01  0.5449341  1.0000000  0.0000000000
-  0.01    0.50  0.5461864  0.9998818  0.0000000000
-  0.01    1.00  0.5462024  0.9999409  0.0000000000
-  0.01    5.00  0.5449707  1.0000000  0.0000000000
-  0.01   10.00  0.5428708  1.0000000  0.0000000000
-  0.05    0.01  0.5475613  0.9997635  0.0006578947
-  0.05    0.50  0.5499208  0.9998227  0.0006578947
-  0.05    1.00  0.5499730  0.9997635  0.0006578947
-  0.05    5.00  0.5484574  0.9998818  0.0000000000
-  0.05   10.00  0.5485611  0.9999409  0.0000000000
-
-ROC was used to select the optimal model using the largest value.
-The final values used for the model were sigma = 0.05 and C = 1.</code></pre>
-</div>
-</div>
-</section>
-<section id="tuned-modeling-1" class="level2">
-<h2 class="anchored" data-anchor-id="tuned-modeling-1">Tuned Modeling</h2>
-</section>
-<section id="conclusion-1" class="level2">
-<h2 class="anchored" data-anchor-id="conclusion-1">Conclusion</h2>
+<p>There’s too many unique relationships to explore for an optimal model in the OLS family, even with the penalized regression flavor. We’re likely tapped-out with an AUC of <strong>~0.76 - 0.78</strong>.</p>
 </section>
 </section>
 

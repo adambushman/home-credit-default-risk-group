@@ -13,10 +13,7 @@ execute:
 
 # Approach
 
-I'm focusing on modeling for `DEFAULT` using the below method(s): 
-
-1.  Penalized Regression
-2.  Support Vector Classifier
+I'm focusing on modeling for `DEFAULT` using Penalized Regression.
 
 
 ## Prep
@@ -26,14 +23,15 @@ Let's load a few libraries:
 ```{r}
 library('tidyverse')
 library('glmnet')
-library('e1071')
 library('caret')
+library('pROC')
+library('rsample')
 ```
 
-We'll load the cleaned, training data:
+We'll load the cleaned, balanced, training data:
 
 ```{r}
-path <- 'D:/All Repos/home-credit-default-risk-group/data/application_train_clean.csv'
+path <- 'D:/All Repos/home-credit-default-risk-group/data/application_train_smote.csv'
 
 data <- data.table::fread(path) |>
     as.data.frame()
@@ -46,18 +44,22 @@ We'll work with a sample of the data since we have over 300K records.
 ```{r}
 set.seed(814)
 
-# 10% sample of the data
-data_sampl <- sample_n(
-    data, 
-    ceiling(nrow(data) * 0.1)
+# Splits
+split_obj <- initial_split(data)
+full_train <- training(split_obj)
+full_test <- testing(split_obj)
+
+# 25% sample of the data
+train_sampl <- sample_n(
+    full_train, ceiling(nrow(full_train) * 0.25)
+)
+
+test_sampl <- sample_n(
+    full_test, ceiling(nrow(full_test) * 0.25)
 )
 ```
 
-All features in this file may conceivably be helpful in predicting `DEFAULT` (originally named `TARGET`), with exception of `SK_ID_CURR`. Let's remove such from our sample:
-
-```{r}
-data_sampl <- data_sampl |> select(-SK_ID_CURR)
-```
+All features in this file may conceivably be helpful in predicting `DEFAULT` (originally named `TARGET`) so we shouldn't need to subset any of them.
 
 
 # Penalized Regression
@@ -66,12 +68,20 @@ data_sampl <- data_sampl |> select(-SK_ID_CURR)
 
 We have  little to no way of knowing which will be predictive. Therefore, an elastic net is probably the best choice.
 
-Let's prepare the data for penalized regression. `glmnet` requires split predictors and target, with the latter being in a vector and the former being cast as a matrix:
+Let's prepare the data for penalized regression. `glmnet` requires split predictors and target, with the latter being in a vector and the former being cast as a matrix.
 
 ```{r}
-target <- data_sampl$DEFAULT
-predictors <- as.matrix(
-    data_sampl |> select(-DEFAULT)
+train_target <- train_sampl$DEFAULT
+train_predictors <- as.matrix(
+    train_sampl |> select(-DEFAULT)
+)
+```
+
+We'll also do it for the test sample data.
+```{r}
+test_target <- test_sampl$DEFAULT
+test_predictors <- as.matrix(
+    test_sampl |> select(-DEFAULT)
 )
 ```
 
@@ -82,8 +92,8 @@ Let's run an elastic net model leveraging cross validation. We'll use the defaul
 
 ```{r}
 mod1 <- cv.glmnet(
-    x = predictors, 
-    y = target, 
+    x = train_predictors, 
+    y = train_target, 
     family = "binomial", 
     alpha = 0.5, 
     type.measure = "auc"
@@ -92,7 +102,7 @@ mod1 <- cv.glmnet(
 mod1
 ```
 
-Using an elastic net model, we're achievingg an AUC of `~0.71` with a standard error of `0.006` with 8 variables. 
+Using an elastic net model, we're achievingg an AUC of `~0.76` with a standard error of `0.002` with 92 dummy variables. 
 
 ```{r}
 plot(mod1)
@@ -116,6 +126,71 @@ coef_df |>
 The external source variables are highly important and predictive. 
 
 
+## Saving model results
+
+Let's use the model we found to be the best and predict new probabilities of the classification.
+
+```{r}
+pred_probs <- predict(mod1, newx = test_predictors, s = 'lambda.1se', type = 'response')
+```
+
+Now, we need to find the ideal threshold for classification of the probabilities:
+
+```{r}
+#| warning: false
+roc_obj <- roc(ifelse(test_target == "Y", 1, 0), pred_probs)
+youden_index <- roc_obj$sensitivities + roc_obj$specificities - 1
+
+optimal_index <- which.max(youden_index)
+optimal_threshold <- roc_obj$thresholds[optimal_index]
+optimal_threshold
+```
+
+We can now use this optimal threshold for the confusion matrix:
+
+```{r}
+mat1 <- confusionMatrix(
+    factor(ifelse(pred_probs > optimal_threshold, 1, 0), levels = c(1,0)), 
+    factor(ifelse(test_target == "Y", 1, 0), levels = c(1,0))
+)
+
+mat1
+```
+
+Let's also grab the AUC value:
+
+```{r}
+auc1 <- auc(roc_obj)
+auc1
+```
+
+Let's compile all these metrics into a dataframe and save the results:
+
+```{r}
+performance <- c(
+    c("model" = "Elastic Net"), 
+    c("hyperparameters" = paste(
+        paste("Lambda:", mod1$lambda.1se), 
+        paste("Mix:", 0.5), 
+        paste("Cutoff:", optimal_threshold), 
+        collapse = ", "
+    )), 
+    mat1$overall[c("Accuracy")], 
+    mat1$byClass[c("Precision", "Recall")], 
+    c("AUC" = auc1)
+)
+
+performance
+```
+
+```{r}
+#| ignore: true
+#| eval: false
+data.frame(as.list(performance)) |>
+    write.csv('models/penalized-regression/model-results.csv', row.names = FALSE)
+```
+
+
 ## Tuned Modeling
 
 The above, basic model assumes a perfect 50-50 elastic net. It could be, however, a better tuned model could improve performance. We test a few different values of `alpha` (the elastic net mix) to see if we can do any better. We will reduce the number of folds to help it run faster:
@@ -126,8 +201,8 @@ results <- list()
 
 for(m in mix) {
     t_mod <- cv.glmnet(
-        x = predictors, 
-        y = target, 
+        x = train_predictors, 
+        y = train_target, 
         family = "binomial", 
         nfolds = 3, 
         alpha = m, 
@@ -162,24 +237,30 @@ We'll implement the following interactions, largely informed by data analysis wo
 7.  `EXT_SOURCE_#` and `IMPUTED_EXT#`
 
 ```{r}
-alt_data_sampl <-
-    data_sampl |>
-    mutate(
-        I_CHILDREN_X_CREDIT = CNT_CHILDREN * AMT_CREDIT, 
-        I_ANNUITY_X_CREDIT = AMT_ANNUITY * AMT_CREDIT, 
-        I_PHONE_CHANGE_X_CREDIT_BUREAU_DAY = DAYS_LAST_PHONE_CHANGE * AMT_REQ_CREDIT_BUREAU_DAY, 
-        I_REGION_RATING_X_30_SOCIAL = REGION_RATING_CLIENT_W_CITY * DEF_30_CNT_SOCIAL_CIRCLE, 
-        I_BUREAU_DAY_X_CREDIT = AMT_REQ_CREDIT_BUREAU_DAY * AMT_CREDIT, 
-        I_CREDIT_X_GOODS = AMT_CREDIT * AMT_GOODS_PRICE, 
-        I_EXT1_X_IMP1 = EXT_SOURCE_1 * IMPUTED_EXT1, 
-        I_EXT2_X_IMP2 = EXT_SOURCE_2 * IMPUTED_EXT2, 
-        I_EXT3_X_IMP3 = EXT_SOURCE_3 * IMPUTED_EXT3
-    )
+add_interactions <- function(data) {
+    alt_data <- 
+        data |>
+        mutate(
+            I_CHILDREN_X_CREDIT = CNT_CHILDREN * AMT_CREDIT, 
+            I_ANNUITY_X_CREDIT = AMT_ANNUITY * AMT_CREDIT, 
+            I_PHONE_CHANGE_X_CREDIT_BUREAU_DAY = DAYS_LAST_PHONE_CHANGE * AMT_REQ_CREDIT_BUREAU_DAY, 
+            I_REGION_RATING_X_30_SOCIAL = REGION_RATING_CLIENT_W_CITY * DEF_30_CNT_SOCIAL_CIRCLE, 
+            I_BUREAU_DAY_X_CREDIT = AMT_REQ_CREDIT_BUREAU_DAY * AMT_CREDIT, 
+            I_CREDIT_X_GOODS = AMT_CREDIT * AMT_GOODS_PRICE, 
+            I_EXT1_X_IMP1 = EXT_SOURCE_1 * IMPUTED_EXT1.Y, 
+            I_EXT2_X_IMP2 = EXT_SOURCE_2 * IMPUTED_EXT2.Y, 
+            I_EXT3_X_IMP3 = EXT_SOURCE_3 * IMPUTED_EXT3.Y
+        )
+    return(alt_data)
+}
+
+alt_train_sampl <- add_interactions(train_sampl)
+alt_test_sampl <- add_interactions(test_sampl)
 ```
 
 ```{r}
-predictors_alt <- as.matrix(
-    alt_data_sampl[,-which(names(alt_data_sampl) %in% c("DEFAULT", "SK_ID_CURR"))]
+alt_train_predictors <- as.matrix(
+    alt_train_sampl[,-which(names(alt_train_sampl) %in% c("DEFAULT"))]
 )
 ```
 
@@ -187,8 +268,8 @@ Let's now use the interaction variables in another cross validated model:
 
 ```{r}
 mod2 <- cv.glmnet(
-    x = predictors_alt, 
-    y = target, 
+    x = alt_train_predictors, 
+    y = train_target, 
     family = "binomial", 
     alpha = 0.5, 
     type.measure = "auc"
@@ -197,7 +278,7 @@ mod2 <- cv.glmnet(
 mod2
 ```
 
-The model really hasn't improved at all with inclusion of these interactions, thought the model is now more complex and suceptible to more variance. 
+The model has improved AUC a touch and decreased the standard error. However, it's drastically increased the complexity of the model by nearly double. Probably not what is wanted.
 
 Let's see if any of these interactions show up as important predictors:
 
@@ -217,74 +298,8 @@ coef_df |>
 It looks as if the following were helpful predictors (though AUC was not improved):
 
 *   The interactions between external source and their imputed flags are very high; we'd expect to see this and its important they do so
-*   `REGION_RATING_CLIENT_W_CITY` and `DEF_30_CNT_SOCIAL_CIRCLE`; a client's neighborhood and social circle behavior is contributing
-*   `AMT_CREDIT` and `AMT_GOODS_PRICE`; what is given for credit and the price thereof is an important, varying relationship
-
+*   Others show up throughout but aren't extremely notable
 
 ## Conclusion
 
-There's too many unique relationships to explore for an optimal model in the OLS family, even with the penalized regression flavor. We're likely tapped-out with an AUC of **~0.71**.
-
-
-# Support Vector Classifier
-
-## Prep
-
-A suport vector machine could be a good approach due to the nature of the problem and data:
-
-*   Many features
-*   Capturing some non-linear relationships
-*   Robustness to overfitting 
-*   Binary classification
-
-Lets get the data ready:
-
-```{r}
-# 3% sample of the data
-data_sampl <- sample_n(
-    data, 
-    ceiling(nrow(data) * 0.03)
-) |>
-    mutate(
-        across(where(is.character), ~make.names(.)), 
-        across(where(is.logical), ~factor(ifelse(.,"Y","N")))
-    ) |>
-    select(-c(SK_ID_CURR, FLAG_MOBIL))
-```
-
-```{r}
-fitControl <- trainControl(
-    method = "repeatedcv", 
-    number = 5, 
-    repeats = 2, 
-    classProbs = TRUE, 
-    summaryFunction = twoClassSummary, 
-    savePredictions = TRUE
-)
-
-fitGrid <- expand.grid(
-    sigma = c(0.01, 0.05), 
-    C = c(0.01, 0.5, 1, 5, 10)
-)
-```
-
-
-## Basic Modeling
-
-```{r}
-mod03 <- train(
-    DEFAULT ~ ., 
-    data = data_sampl, 
-    method = "svmRadial", 
-    trControl = fitControl, 
-    metric = "ROC",  # Use ROC for AUC
-    tuneGrid = fitGrid
-)
-
-mod03
-```
-
-## Tuned Modeling
-
-
-## Conclusion
+There's too many unique relationships to explore for an optimal model in the OLS family, even with the penalized regression flavor. We're likely tapped-out with an AUC of **~0.76 - 0.78**.
