@@ -1,0 +1,359 @@
+---
+title: "Modeling for Default"
+subtitle: "Modeling default for loan applications with various techniques"
+author: "Adam Bushman"
+date: "2024-10-20"
+format:
+    html:
+        embed-resources: true
+execute:
+    warning: false
+---
+
+
+
+
+# Approach
+
+I'm focusing on modeling for `DEFAULT` using Penalized Regression. 
+
+This is a good approach since we have A LOT of predictors and we don't have a great way of knowing which are helpful and not. With an elastic net, we can solve for this.
+
+Additionally, we can overcome any multicollinearity.
+
+## Prep
+
+Let's load a few libraries:
+
+
+
+```{r}
+library('tidyverse')
+library('glmnet')
+library('caret')
+library('smotefamily')
+```
+
+
+
+We'll load the cleaned, training data:
+
+
+
+```{r}
+path <- 'D:/All Repos/home-credit-default-risk-group/data/application_train_clean.csv'
+
+data <- data.table::fread(path) |>
+    as.data.frame()
+
+glimpse(data)
+```
+
+
+
+Because penalized regression is so efficient, we shouldn't need to take a sample of the data.
+
+All features in this file may conceivably be helpful in predicting `DEFAULT` (originally named `TARGET`), with exception of `SK_ID_CURR`. Let's remove such from our sample.
+
+We do have a class imbalance to work out: 
+
+
+
+```{r}
+unique <- sapply(data, function(x) length(unique(x)))
+
+unique[unique == 1]
+```
+
+
+
+Let's remove `FLAG_MOBIL` and `SK_ID_CURR` such from our sample and format the data to handle SMOTE:
+
+
+
+```{r}
+data_clean <- data |> 
+    select(-c(SK_ID_CURR, FLAG_MOBIL)) |>
+    mutate(
+        DEFAULT = factor(DEFAULT), 
+        across(where(is.character) & -DEFAULT, ~factor(make.names(.))), 
+        across(where(is.logical), ~factor(ifelse(.,"Y","N")))
+    )
+```
+
+
+
+We need to handle class imbalance:
+
+
+
+```{r}
+table(data_clean$DEFAULT) |>
+    prop.table()
+```
+
+
+
+Because of how much data is available to use, let's perform over-sampling on the minority class. We can use the SMOTE technique thanks to the `{smotefamily}` package.
+
+We first must turn the factors into one-hot-encoded values:
+
+
+
+```{r}
+dmy <- dummyVars("~ . -DEFAULT", data_clean)
+data_dmy <- data.frame(predict(dmy, data_clean))
+```
+
+```{r}
+smote_results <- SMOTE(
+    data_dmy, 
+    target = data_clean$DEFAULT
+)
+
+data_smote <- smote_results$data |>
+    mutate(DEFAULT = ifelse(class == "TRUE", "Y", "N")) |>
+    select(-class)
+```
+
+
+
+We can double check the new weighting:
+
+
+
+```{r}
+table(data_smote$DEFAULT) |>
+    prop.table()
+```
+
+
+
+Let's take a sample of this data and then format the predictors into a matrix for `{glmnet}`:
+
+
+
+```{r}
+data_smote_sampl <- 
+    data_smote |>
+    sample_n(ceiling(nrow(data_smote)) * 0.1)
+```
+
+```{r}
+target <- data_smote_sampl$DEFAULT
+predictors <- as.matrix(
+    data_smote_sampl |> select(-DEFAULT)
+)
+```
+
+
+
+
+## Basic Modeling
+
+Let's run an elastic net model leveraging cross validation. We'll use the default 10 folds. The output we get will measure `AUC` and the standard error thereof.
+
+
+
+```{r}
+mod1 <- cv.glmnet(
+    x = predictors, 
+    y = target, 
+    family = "binomial", 
+    alpha = 0.5, 
+    type.measure = "auc", 
+    keep = TRUE
+)
+
+mod1
+```
+
+
+
+Using an elastic net model, we're achievingg an AUC of `~0.76` with a standard error of `0.003` with 91 variables (including dummies). 
+
+Let's assemble the full table of performance metrics:
+
+
+
+```{r}
+roc_obj <- pROC::roc(vals, probs)
+thresh <- pROC::coords(roc_obj, "best", ret = "threshold", best.method = "youden")
+```
+
+```{r}
+preds <- predict(mod1, newx = predictors, s = "lambda.1se")
+probs <- 1 / (1 - exp(as.vector(preds)))
+vals <- ifelse(probs > thresh, "Y", "N")
+```
+
+```{r}
+measures <- confusionMatrix(factor(vals), factor(target))
+
+performance <- c(
+    c("model" = "Elastic Net"), 
+    c("hyperparameters" = paste("Lambda:", mod1$lambda[mod1$index[2]])), 
+    measures$overall[c("Accuracy")], 
+    measures$byClass[c("Precision", "Recall")], 
+    c("AUC" = mod1$cvm[mod1$index[2]])
+)
+
+performance
+```
+
+```{r}
+#| eval: FALSE
+#| include: FALSE
+data.frame(as.list(performance)) |> 
+    write.csv('models/penalized-regression/model-results.csv', row.names = FALSE)
+```
+
+
+
+Let's look at the significant coefficients for the `1se` model since its VERY close to the absolute minimum in terms of performance:
+
+
+
+```{r}
+coef <- coef(mod1, "lambda.1se")
+coef_df <- as.data.frame(as.matrix(coef))
+coef_df$Predictor <- rownames(coef)
+colnames(coef_df)[1] <- "Coefficient"
+rownames(coef_df) <- NULL
+
+coef_df |>
+    select(Predictor, Coefficient) |>
+    mutate(Important_Flag = ifelse(Coefficient == 0, 0, 1)) |>
+    arrange(desc(abs(Coefficient)))
+```
+
+
+
+The external source variables are highly important and predictive. 
+
+
+## Tuned Modeling
+
+The above, basic model assumes a perfect 50-50 elastic net. It could be, however, a better tuned model could improve performance. We test a few different values of `alpha` (the elastic net mix) to see if we can do any better. We will reduce the number of folds to help it run faster:
+
+
+
+```{r}
+mix <- seq(0.2, 0.8, 0.2)
+results <- list()
+
+for(m in mix) {
+    t_mod <- cv.glmnet(
+        x = predictors, 
+        y = target, 
+        family = "binomial", 
+        nfolds = 3, 
+        alpha = m, 
+        type.measure = "auc"
+    )
+
+    results[[length(results) + 1]] <- c(m, t_mod$cvm[t_mod$index])
+}
+```
+
+```{r}
+results_df <- as.data.frame(do.call(rbind, results))
+names(results_df) <- c("mix", "AUC_lambda.min", "AUC_lambda.1se")
+results_df
+```
+
+
+
+We aren't achieving really any better or worse results with a weighted elastic net. The next step would be determining if some interaction terms could improve things.
+
+
+## Interaction terms
+
+We're going to create some interaction terms, something to indicate a varying relationship between predictors.
+
+We'll implement the following interactions, largely informed by data analysis work and what was found above to be important predictors in estimating default:
+
+1.  `CNT_CHILDREN` and `AMT_CREDIT`
+2.  `AMT_ANNUITY` and `AMT_CREDIT`
+3.  `DAYS_LAST_PHONE_CHANGE` and `AMT_REQ_CREDIT_BUREAU_DAY`
+4.  `REGION_RATING_CLIENT_W_CITY` and `DEF_30_CNT_SOCIAL_CIRCLE`
+5.  `AMT_REQ_CREDIT_BUREAU_DAY` and `AMT_CREDIT`
+6.  `AMT_CREDIT` and `AMT_GOODS_PRICE`
+7.  `EXT_SOURCE_#` and `IMPUTED_EXT#`
+
+
+
+```{r}
+alt_data_smote <-
+    data_smote |>
+    mutate(
+        I_CHILDREN_X_CREDIT = CNT_CHILDREN * AMT_CREDIT, 
+        I_ANNUITY_X_CREDIT = AMT_ANNUITY * AMT_CREDIT, 
+        I_PHONE_CHANGE_X_CREDIT_BUREAU_DAY = DAYS_LAST_PHONE_CHANGE * AMT_REQ_CREDIT_BUREAU_DAY, 
+        I_REGION_RATING_X_30_SOCIAL = REGION_RATING_CLIENT_W_CITY * DEF_30_CNT_SOCIAL_CIRCLE, 
+        I_BUREAU_DAY_X_CREDIT = AMT_REQ_CREDIT_BUREAU_DAY * AMT_CREDIT, 
+        I_CREDIT_X_GOODS = AMT_CREDIT * AMT_GOODS_PRICE, 
+        I_EXT1_X_IMP1 = EXT_SOURCE_1 * IMPUTED_EXT1, 
+        I_EXT2_X_IMP2 = EXT_SOURCE_2 * IMPUTED_EXT2, 
+        I_EXT3_X_IMP3 = EXT_SOURCE_3 * IMPUTED_EXT3
+    )
+```
+
+```{r}
+predictors_alt <- as.matrix(
+    alt_data_smote |> select(-DEFAULT)
+)
+```
+
+
+
+Let's now use the interaction variables in another cross validated model:
+
+
+
+```{r}
+mod2 <- cv.glmnet(
+    x = predictors_alt, 
+    y = target, 
+    family = "binomial", 
+    alpha = 0.5, 
+    type.measure = "auc"
+)
+
+mod2
+```
+
+
+
+The model really hasn't improved at all with inclusion of these interactions, thought the model is now more complex and suceptible to more variance. 
+
+Let's see if any of these interactions show up as important predictors:
+
+
+
+```{r}
+coef <- coef(mod2, "lambda.1se")
+coef_df <- as.data.frame(as.matrix(coef))
+coef_df$Predictor <- rownames(coef)
+colnames(coef_df)[1] <- "Coefficient"
+rownames(coef_df) <- NULL
+
+coef_df |>
+    select(Predictor, Coefficient) |>
+    mutate(Important_Flag = ifelse(Coefficient == 0, 0, 1)) |>
+    arrange(desc(abs(Coefficient)))
+```
+
+
+
+It looks as if the following were helpful predictors (though AUC was not improved):
+
+*   The interactions between external source and their imputed flags are very high; we'd expect to see this and its important they do so
+*   `REGION_RATING_CLIENT_W_CITY` and `DEF_30_CNT_SOCIAL_CIRCLE`; a client's neighborhood and social circle behavior is contributing
+*   `AMT_CREDIT` and `AMT_GOODS_PRICE`; what is given for credit and the price thereof is an important, varying relationship
+
+
+## Conclusion
+
+There's too many unique relationships to explore for an optimal model in the OLS family, even with the penalized regression flavor. We're likely tapped-out with an AUC of **~0.71**.
+RITM0884995

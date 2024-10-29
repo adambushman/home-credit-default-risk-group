@@ -1,0 +1,2 @@
+"model","hyperparameters","Accuracy","Precision","Recall","AUC"
+"Elastic Net","Lambda: 0.00592032319499247","0.696641152633949","0.701932966838092","0.701037866175481","0.760182100315124"

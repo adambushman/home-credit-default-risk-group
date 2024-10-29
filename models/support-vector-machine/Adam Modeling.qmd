@@ -1,0 +1,152 @@
+---
+title: "Modeling for Default"
+subtitle: "Modeling default for loan applications with Support Vector Machines"
+author: "Adam Bushman"
+date: "2024-10-20"
+format:
+    html:
+        embed-resources: true
+execute:
+    warning: false
+---
+
+
+# Approach
+
+I'm focusing on modeling for `DEFAULT` using **Support Vector Machines**.
+
+A suport vector machine could be a good approach due to the nature of the problem and data:
+
+*   Many features
+*   Capturing some non-linear relationships
+*   Robustness to overfitting 
+*   Binary classification
+
+
+## Prep
+
+Let's load a few libraries:
+
+```{r}
+library('tidyverse')
+library('e1071')
+library('caret')
+library('smotefamily')
+```
+
+We'll load the cleaned, training data:
+
+```{r}
+path <- 'data/application_train_clean.csv'
+
+data <- data.table::fread(path) |>
+    as.data.frame()
+
+glimpse(data)
+```
+
+All features in this file may conceivably be helpful in predicting `DEFAULT` (originally named `TARGET`), with exception of `SK_ID_CURR`. Additionally, we need to remove all categorical variables that have just 1 class (essentially, constants).
+
+We do have a class imbalance to work out: 
+
+```{r}
+unique <- sapply(data, function(x) length(unique(x)))
+
+unique[unique == 1]
+```
+
+Let's remove `FLAG_MOBIL` and `SK_ID_CURR` such from our sample and format the data to handle SMOTE:
+
+```{r}
+data_clean <- data |> 
+    select(-c(SK_ID_CURR, FLAG_MOBIL)) |>
+    mutate(
+        DEFAULT = factor(DEFAULT), 
+        across(where(is.character) & -DEFAULT, ~factor(make.names(.))), 
+        across(where(is.logical), ~factor(ifelse(.,"Y","N")))
+    )
+```
+
+We need to handle class imbalance:
+
+```{r}
+table(data_clean$DEFAULT) |>
+    prop.table()
+```
+
+Because of how much data is available to use, let's perform over-sampling on the minority class. We can use the SMOTE technique thanks to the `{smotefamily}` package.
+
+We first must turn the factors into one-hot-encoded values:
+
+```{r}
+dmy <- dummyVars("~ . -DEFAULT", data_clean)
+data_dmy <- data.frame(predict(dmy, data_clean))
+```
+
+```{r}
+smote_results <- SMOTE(
+    data_dmy, 
+    target = data_clean$DEFAULT
+)
+
+data_smote <- smote_results$data |>
+    mutate(DEFAULT = ifelse(class == "TRUE", "Y", "N")) |>
+    select(-class)
+```
+
+We can double check the new weighting:
+
+```{r}
+table(data_smote$DEFAULT) |>
+    prop.table()
+```
+
+We now want to take a sample of the data since its so large. We'll work with a 2%:
+
+```{r}
+data_smote_sampl <- sample_n(
+    data_smote, 
+    ceiling(nrow(data_smote) * 0.02)
+)
+```
+
+We also want to setup our cross validation:
+
+```{r}
+fitControl <- trainControl(
+    method = "repeatedcv", 
+    number = 5, 
+    repeats = 2, 
+    classProbs = TRUE, 
+    summaryFunction = twoClassSummary, 
+    savePredictions = TRUE
+)
+
+fitGrid <- expand.grid(
+    sigma = c(0.01, 0.05), 
+    C = c(0.01, 0.5, 1, 5, 10)
+)
+```
+
+
+## Basic Modeling
+
+We can now setup a cross-validated training of `DEFAULT` with the SMOTE data:
+
+```{r}
+mod03 <- train(
+    DEFAULT ~ ., 
+    data = data_smote_sampl, 
+    method = "svmRadial", 
+    trControl = fitControl, 
+    metric = "ROC",  # Use ROC for AUC
+    tuneGrid = fitGrid
+)
+
+mod03
+```
+
+## Tuned Modeling
+
+
+## Conclusion
