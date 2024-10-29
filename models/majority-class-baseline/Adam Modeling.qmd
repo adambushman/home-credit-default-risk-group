@@ -1,0 +1,122 @@
+---
+title: "Modeling for Default"
+subtitle: "Modeling default for loan applications with majority class baseline"
+author: "Adam Bushman"
+date: "2024-10-20"
+format:
+    html:
+        embed-resources: true
+execute:
+    warning: false
+---
+
+
+# Approach
+
+I'm focusing on modeling for `DEFAULT` using the majority class. This will establish a "baseline". We'll do so first with the imbalanced data and then with the balanced.
+
+## Prep
+
+Let's load a few libraries:
+
+```{r}
+library('tidyverse')
+library('caret')
+library('rsample')
+library('pROC')
+```
+
+We'll load the cleaned, training data, both versions. We'll also just turn the target variable numeric for ease:
+
+```{r}
+imbal_data <- data.table::fread('D:/All Repos/home-credit-default-risk-group/data/application_train_clean.csv') |>
+    as.data.frame() |>
+    mutate(DEFAULT = ifelse(DEFAULT,1,0))
+
+bal_data <- data.table::fread('D:/All Repos/home-credit-default-risk-group/data/application_train_smote.csv') |>
+    as.data.frame() |>
+    mutate(DEFAULT = ifelse(DEFAULT == 'Y',1,0))
+```
+
+## Calculation
+
+All we have to do is assume the majority class is going to be the predicted value. Then we generate a confusion matrix and summary statistics. 
+
+```{r}
+table(imbal_data$DEFAULT) |> prop.table()
+```
+
+So `FALSE` is our majority classifier. Let's now assume all predictions are "FALSE" and generate a confusion matrix.
+
+```{r}
+imbal_data$pred <- 0
+mat1 <- caret::confusionMatrix(factor(imbal_data$pred), factor(imbal_data$DEFAULT))
+mat1
+```
+
+We can also calcualte the AUC value:
+
+```{r}
+roc_obj1 <- pROC::roc(imbal_data$DEFAULT, imbal_data$pred)
+auc_val1 <- pROC::auc(roc_obj1)
+auc_val1
+```
+
+Let's assemble all of this into a vector:
+
+```{r}
+performance1 <- c(
+    c("model" = "Majority Class, Imbalanced"), 
+    c("hyperparameters" = "None"), 
+    mat1$overall[c("Accuracy")], 
+    mat1$byClass[c("Precision", "Recall")], 
+    c("AUC" = auc_val1)
+)
+
+performance1
+```
+
+Let's now do the same thing for the balanced data.
+
+```{r}
+bal_data$pred <- 0
+mat2 <- caret::confusionMatrix(factor(bal_data$pred), factor(bal_data$DEFAULT))
+mat2
+```
+
+```{r}
+roc_obj2 <- pROC::roc(bal_data$DEFAULT, bal_data$pred)
+auc_val2 <- pROC::auc(roc_obj2)
+auc_val2
+```
+
+```{r}
+performance2 <- c(
+    c("model" = "Majority Class, Balanced"), 
+    c("hyperparameters" = "None"), 
+    mat2$overall[c("Accuracy")], 
+    mat2$byClass[c("Precision", "Recall")], 
+    c("AUC" = auc_val2)
+)
+
+performance2
+```
+
+Let's now turn this into a dataframe and write it to a CSV for pooling with future models.
+
+```{r}
+df <-
+    data.frame(as.list(performance1)) |>
+    rbind(
+        data.frame(as.list(performance2))
+    )
+
+df
+```
+
+```{r}
+#| eval: FALSE
+#| include: FALSE
+data.frame(as.list(df)) |> 
+    write.csv('models/majority-class-baseline/model-results.csv', row.names = FALSE)
+```
