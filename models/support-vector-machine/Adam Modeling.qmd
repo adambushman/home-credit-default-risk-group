@@ -1,0 +1,211 @@
+---
+title: "Modeling for Default"
+subtitle: "Modeling default for loan applications with Support Vector Machines"
+author: "Adam Bushman"
+date: "2024-10-20"
+format:
+    html:
+        embed-resources: true
+execute:
+    warning: false
+---
+
+
+# Approach
+
+I'm focusing on modeling for `DEFAULT` using **Support Vector Machines**.
+
+A suport vector machine could be a good approach due to the nature of the problem and data:
+
+*   Many features
+*   Capturing some non-linear relationships
+*   Robustness to overfitting 
+*   Binary classification
+
+
+## Prep
+
+Let's load a few libraries:
+
+```{r}
+library('tidyverse')
+library('e1071')
+library('caret')
+library('pROC')
+library('rsample')
+```
+
+We'll load the cleaned, balanced, training data:
+
+```{r}
+path <- 'D:/All Repos/home-credit-default-risk-group/data/application_train_smote.csv'
+
+data <- data.table::fread(path) |>
+    as.data.frame() |> 
+    mutate(DEFAULT = factor(DEFAULT, levels = c("N", "Y")))
+
+glimpse(data)
+```
+
+All features in this file may conceivably be helpful in predicting `DEFAULT` (originally named `TARGET`), with exception of `SK_ID_CURR`. Additionally, we need to remove all categorical variables that have just 1 class (essentially, constants).
+
+We do have a class imbalance to work out: 
+
+We'll work with a sample of the data since we have over 300K records.
+
+```{r}
+set.seed(2015)
+
+# Splits
+partition_idx <- createDataPartition(data$DEFAULT, p = 0.8, list = FALSE)
+full_train <- data[partition_idx,]
+full_test <- data[-partition_idx,]
+
+# 2% sample of the data
+train_sampl <- sample_n(
+    full_train, ceiling(nrow(full_train) * 0.02)
+)
+test_sampl <- sample_n(
+    full_test, ceiling(nrow(full_test) * 0.05)
+)
+```
+
+```{r}
+unique <- sapply(train_sampl, function(x) length(unique(x)))
+remove_cols <- names(unique[unique == 1])
+
+train_sampl <- train_sampl |> select(-all_of(remove_cols))
+test_sampl <- test_sampl |> select(-all_of(remove_cols))
+```
+
+All features in this file may conceivably be helpful in predicting `DEFAULT` (originally named `TARGET`) so we shouldn't need to subset any of them.
+
+## Support Vector machine
+
+We also want to setup our cross validation requiring folds, a tuning grid, and a loop:
+
+```{r}
+train_folds <- rsample::vfold_cv(train_sampl)
+```
+
+```{r}
+fitGrid <- expand.grid(
+    sigma = c(0.01, 0.05), 
+    C = c(0.01, 0.5, 1, 5, 10), 
+    AUC = 0
+)
+```
+
+
+## Basic Modeling
+
+We can now setup a cross-validated training of `DEFAULT` with the SMOTE data:
+
+```{r}
+runCvSVM <- function(grid, folds) {
+    for(i in 1:nrow(folds)) {
+        # Values for modeling
+        fold <- folds$splits[i][[1]]
+        sigma <- grid$sigma[i]
+        C <- grid$C[i]
+
+        # Training
+        train <- training(fold)
+        unique <- sapply(train, function(x) length(unique(x)))
+        remove_cols <- names(unique[unique == 1])
+
+        train <- train |> select(-all_of(remove_cols))
+        modl <- e1071::svm(DEFAULT ~ ., data = train, sigma = sigma, C = C)
+        
+        # Testing
+        test <- testing(fold) |> select(-all_of(remove_cols))
+        pred <- predict(modl, newdata = test, type = 'response')
+
+        # Evaluation
+        roc_obj <- roc(ifelse(test$DEFAULT == "Y", 1, 0), ifelse(pred == "Y", 1, 0))
+        auc <- auc(roc_obj)
+
+        # Save measure
+        grid$AUC[i] = auc
+        print(paste0("AUC from fold ", i, ":"))
+        print(auc)
+    }
+    return(grid)
+}
+```
+
+```{r}
+results <- runCvSVM(fitGrid, train_folds)
+results
+```
+
+The AUC values are looking really great. At around 0.83, that's even better than we were estimating with a balanced, penalized regression model.
+
+Let's now generate full metrics from the best model we've got here: `sigma = 0.05` and `C = 5.00`:
+
+```{r}
+tuned_mod <- e1071::svm(DEFAULT ~ ., data = train_sampl, sigma = 0.05, C = 5.00)
+```
+
+```{r}
+pred_probs <- predict(tuned_mod, newdata = test_sampl, type = 'response')
+```
+
+Now, we need to find the ideal threshold for classification of the probabilities:
+
+```{r}
+#| warning: false
+roc_obj <- roc(ifelse(test_sampl$DEFAULT == "Y", 1, 0), ifelse(pred_probs == "Y", 1, 0))
+youden_index <- roc_obj$sensitivities + roc_obj$specificities - 1
+
+optimal_index <- which.max(youden_index)
+optimal_threshold <- roc_obj$thresholds[optimal_index]
+optimal_threshold
+```
+
+We can now use this optimal threshold for the confusion matrix:
+
+```{r}
+mat3 <- confusionMatrix(
+    factor(ifelse(pred_probs == "Y", 1, 0), levels = c(1,0)), 
+    factor(ifelse(test_sampl$DEFAULT == "Y", 1, 0), levels = c(1,0))
+)
+
+mat3
+```
+
+Let's also grab the AUC value:
+
+```{r}
+auc3 <- auc(roc_obj)
+auc3
+```
+
+Let's compile all these metrics into a dataframe and save the results:
+
+```{r}
+performance <- c(
+    c("model" = "Support Vector Machine"), 
+    c("hyperparameters" = paste(
+        paste("Sigma:", 0.1), 
+        paste("C:", 10.0), 
+        collapse = ", "
+    )), 
+    mat3$overall[c("Accuracy")], 
+    mat3$byClass[c("Precision", "Recall")], 
+    c("AUC" = auc3)
+)
+
+performance
+```
+
+```{r}
+#| ignore: true
+#| eval: false
+data.frame(as.list(performance)) |>
+    write.csv('models/support-vector-machine/model-results.csv', row.names = FALSE)
+```
+
+## Conclusion
+
+Despite all of my research, I can't figure out why the cross validation AUC is so poor but the AUC with the testing data is so good. It has to be an issue with the cross validation using caret. 
