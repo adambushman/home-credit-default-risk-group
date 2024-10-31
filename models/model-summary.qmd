@@ -18,7 +18,24 @@ Let's read in all the results of the various models we've experimented with.
 
 ```{r}
 mcb1 <- read.csv('majority-class-baseline/model-results.csv')
-mcb2 <- read.csv('majority-class-baseline/model-results.csv')
+elas <- read.csv('penalized-regression/model-results.csv')
+svm <- read.csv('support-vector-machine/model-results.csv')
+rf1 <- data.frame(
+    model = "Random Forest, 1", 
+    hyperparameters = "Trees = 500, Depth = 10", 
+    Accuracy = 0.942, 
+    Precision = 0.8984, 
+    Recall = 0.9999, 
+    AUC = 0.98
+)
+rf2 <- data.frame(
+    model = "Random Forest, 2", 
+    hyperparameters = "Trees = 800, Depth = 20", 
+    Accuracy = 0.9542, 
+    Precision = 0.9173, 
+    Recall = 0.9128, 
+    AUC = 0.98
+)
 ```
 
 We then combine them into a single data frame we can use for plotting.
@@ -26,26 +43,37 @@ We then combine them into a single data frame we can use for plotting.
 ```{r}
 full_results <- 
     bind_rows(
-        mcb1, 
-        mcb2
-    )
+        mcb1, elas, svm, rf1, rf2
+    ) |>
+    as_tibble()
 
 full_results
+```
+
+We need to turn this into a along format. Also, we'll wrap the labels:
+
+```{r}
+full_results_long <- 
+    pivot_longer(
+        full_results, 
+        cols = -c(model, hyperparameters)
+    ) |>
+    mutate(
+        model = stringr::str_wrap(model, 15)
+    )
 ```
 
 Let's generate a basic, comparison plot across the various measures.
 
 ```{r}
 ggplot(
-    pivot_longer(
-        full_results, 
-        cols = -c(model, hyperparameters)
-    ), 
-    aes(x = "1", y = value, label = model)
+    full_results_long, 
+    aes(x = "1", y = value, label = paste0(model, " (", round(value,2) ,")"))
 ) +
     geom_label(
         aes(fill = model), 
-        size = 2.5, 
+        position = "jitter", 
+        size = 2, 
         show.legend = FALSE
     ) +
     facet_wrap(~name, nrow = 1) +
