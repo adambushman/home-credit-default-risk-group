@@ -50,19 +50,30 @@ full_results <-
 full_results
 ```
 
+We need to turn this into a along format. Also, we'll wrap the labels:
+
+```{r}
+full_results_long <- 
+    pivot_longer(
+        full_results, 
+        cols = -c(model, hyperparameters)
+    ) |>
+    mutate(
+        model = stringr::str_wrap(model, 15)
+    )
+```
+
 Let's generate a basic, comparison plot across the various measures.
 
 ```{r}
 ggplot(
-    pivot_longer(
-        full_results, 
-        cols = -c(model, hyperparameters)
-    ), 
-    aes(x = "1", y = value, label = model)
+    full_results_long, 
+    aes(x = "1", y = value, label = paste0(model, " (", round(value,2) ,")"))
 ) +
     geom_label(
         aes(fill = model), 
-        size = 2.5, 
+        position = "jitter", 
+        size = 2, 
         show.legend = FALSE
     ) +
     facet_wrap(~name, nrow = 1) +
