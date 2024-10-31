@@ -374,67 +374,8 @@ library(pROC)
 
 application_train_clean &lt;- as.data.frame(fread(&quot;data/application_train_clean.csv&quot;))
 application_test_clean &lt;- as.data.frame(fread(&quot;data/application_test_clean.csv&quot;))
- 
-str(application_train_clean)</code></pre>
-<pre><code>## &#39;data.frame&#39;:    307216 obs. of  58 variables:
-##  $ SK_ID_CURR                 : int  100002 100003 100004 100006 100007 100008 100009 100010 100011 100012 ...
-##  $ DEFAULT                    : logi  TRUE FALSE FALSE FALSE FALSE FALSE ...
-##  $ CASH_LOAN                  : logi  TRUE TRUE FALSE TRUE TRUE TRUE ...
-##  $ GENDER_MALE                : logi  TRUE FALSE TRUE FALSE TRUE TRUE ...
-##  $ FLAG_OWN_CAR               : logi  FALSE FALSE TRUE FALSE FALSE FALSE ...
-##  $ FLAG_OWN_REALTY            : logi  TRUE FALSE TRUE TRUE TRUE TRUE ...
-##  $ CNT_CHILDREN               : int  0 0 0 0 0 0 1 0 0 0 ...
-##  $ AMT_INCOME_TOTAL           : num  202500 270000 67500 135000 121500 ...
-##  $ AMT_CREDIT                 : num  406598 1293503 135000 312683 513000 ...
-##  $ AMT_ANNUITY                : num  24701 35699 6750 29687 21866 ...
-##  $ AMT_GOODS_PRICE            : num  351000 1129500 135000 297000 513000 ...
-##  $ NAME_TYPE_SUITE            : chr  &quot;Unaccompanied&quot; &quot;Family&quot; &quot;Unaccompanied&quot; &quot;Unaccompanied&quot; ...
-##  $ NAME_INCOME_TYPE           : chr  &quot;Working&quot; &quot;State servant&quot; &quot;Working&quot; &quot;Working&quot; ...
-##  $ NAME_EDUCATION_TYPE        : chr  &quot;Secondary / secondary special&quot; &quot;Higher education&quot; &quot;Secondary / secondary special&quot; &quot;Secondary / secondary special&quot; ...
-##  $ NAME_FAMILY_STATUS         : chr  &quot;Single / not married&quot; &quot;Married&quot; &quot;Single / not married&quot; &quot;Civil marriage&quot; ...
-##  $ NAME_HOUSING_TYPE          : chr  &quot;House / apartment&quot; &quot;House / apartment&quot; &quot;House / apartment&quot; &quot;House / apartment&quot; ...
-##  $ REGION_POPULATION_RELATIVE : num  0.0188 0.00354 0.01003 0.00802 0.02866 ...
-##  $ DAYS_BIRTH                 : int  -9461 -16765 -19046 -19005 -19932 -16941 -13778 -18850 -20099 -14469 ...
-##  $ DAYS_EMPLOYED              : int  -637 -1188 -225 -3039 -3038 -1588 -3130 -449 365243 -2019 ...
-##  $ DAYS_REGISTRATION          : num  -3648 -1186 -4260 -9833 -4311 ...
-##  $ DAYS_ID_PUBLISH            : int  -2120 -291 -2531 -2437 -3458 -477 -619 -2379 -3514 -3992 ...
-##  $ OWN_CAR_AGE                : int  0 0 27 0 0 0 18 9 0 0 ...
-##  $ FLAG_MOBIL                 : logi  TRUE TRUE TRUE TRUE TRUE TRUE ...
-##  $ FLAG_EMP_PHONE             : logi  TRUE TRUE TRUE TRUE TRUE TRUE ...
-##  $ FLAG_WORK_PHONE            : logi  FALSE FALSE TRUE FALSE FALSE TRUE ...
-##  $ FLAG_CONT_MOBILE           : logi  TRUE TRUE TRUE TRUE TRUE TRUE ...
-##  $ FLAG_PHONE                 : logi  TRUE TRUE TRUE FALSE FALSE TRUE ...
-##  $ FLAG_EMAIL                 : logi  FALSE FALSE FALSE FALSE FALSE FALSE ...
-##  $ OCCUPATION_TYPE            : chr  &quot;Laborers&quot; &quot;Core staff&quot; &quot;Laborers&quot; &quot;Laborers&quot; ...
-##  $ CNT_FAM_MEMBERS            : int  1 2 1 2 1 2 3 2 2 1 ...
-##  $ REGION_RATING_CLIENT       : int  2 1 2 2 2 2 2 3 2 2 ...
-##  $ REGION_RATING_CLIENT_W_CITY: int  2 1 2 2 2 2 2 3 2 2 ...
-##  $ WEEKDAY_APPR_PROCESS_START : chr  &quot;WEDNESDAY&quot; &quot;MONDAY&quot; &quot;MONDAY&quot; &quot;WEDNESDAY&quot; ...
-##  $ HOUR_APPR_PROCESS_START    : int  10 11 9 17 11 16 16 16 14 8 ...
-##  $ REG_REGION_NOT_LIVE_REGION : logi  FALSE FALSE FALSE FALSE FALSE FALSE ...
-##  $ REG_REGION_NOT_WORK_REGION : logi  FALSE FALSE FALSE FALSE FALSE FALSE ...
-##  $ LIVE_REGION_NOT_WORK_REGION: logi  FALSE FALSE FALSE FALSE FALSE FALSE ...
-##  $ REG_CITY_NOT_LIVE_CITY     : logi  FALSE FALSE FALSE FALSE FALSE FALSE ...
-##  $ REG_CITY_NOT_WORK_CITY     : logi  FALSE FALSE FALSE FALSE TRUE FALSE ...
-##  $ LIVE_CITY_NOT_WORK_CITY    : logi  FALSE FALSE FALSE FALSE TRUE FALSE ...
-##  $ ORGANIZATION_TYPE          : chr  &quot;Business Entity Type 3&quot; &quot;School&quot; &quot;Government&quot; &quot;Business Entity Type 3&quot; ...
-##  $ EXT_SOURCE_1               : num  0.083 0.311 0.502 0.502 0.502 ...
-##  $ EXT_SOURCE_2               : num  0.263 0.622 0.556 0.65 0.323 ...
-##  $ EXT_SOURCE_3               : num  0.139 0.535 0.73 0.535 0.535 ...
-##  $ OBS_30_CNT_SOCIAL_CIRCLE   : int  2 1 0 2 0 0 1 2 1 2 ...
-##  $ DEF_30_CNT_SOCIAL_CIRCLE   : int  2 0 0 0 0 0 0 0 0 0 ...
-##  $ OBS_60_CNT_SOCIAL_CIRCLE   : int  2 1 0 2 0 0 1 2 1 2 ...
-##  $ DEF_60_CNT_SOCIAL_CIRCLE   : int  2 0 0 0 0 0 0 0 0 0 ...
-##  $ DAYS_LAST_PHONE_CHANGE     : int  -1134 -828 -815 -617 -1106 -2536 -1562 -1070 0 -1673 ...
-##  $ AMT_REQ_CREDIT_BUREAU_HOUR : int  0 0 0 0 0 0 0 0 0 0 ...
-##  $ AMT_REQ_CREDIT_BUREAU_DAY  : int  0 0 0 0 0 0 0 0 0 0 ...
-##  $ AMT_REQ_CREDIT_BUREAU_WEEK : int  0 0 0 0 0 0 0 0 0 0 ...
-##  $ AMT_REQ_CREDIT_BUREAU_MON  : int  0 0 0 0 0 0 1 0 0 0 ...
-##  $ AMT_REQ_CREDIT_BUREAU_QRT  : int  0 0 0 0 0 1 1 0 0 0 ...
-##  $ AMT_REQ_CREDIT_BUREAU_YEAR : int  1 0 0 0 0 1 2 0 1 0 ...
-##  $ IMPUTED_EXT1               : logi  FALSE FALSE TRUE TRUE TRUE TRUE ...
-##  $ IMPUTED_EXT2               : logi  FALSE FALSE FALSE FALSE FALSE FALSE ...
-##  $ IMPUTED_EXT3               : logi  FALSE TRUE FALSE TRUE TRUE FALSE ...</code></pre>
+
+application_train_smote &lt;- as.data.frame(fread(&quot;data/application_train_smote.csv&quot;))</code></pre>
 </div>
 <div id="class-balance" class="section level1">
 <h1>Class Balance</h1>
@@ -471,66 +412,66 @@ class_weights &lt;- 1 / class_proportions
 # train RF model with 500 trees, 10 depth
 rf_model &lt;- ranger(formula = DEFAULT ~ ., data = credit_train_set, 
                    num.trees = 500, max.depth = 10, oob.error = TRUE, class.weights = class_weights, , importance = &#39;impurity&#39;, seed = 1234)</code></pre>
-<pre><code>## Growing trees.. Progress: 59%. Estimated remaining time: 21 seconds.</code></pre>
+<pre><code>## Growing trees.. Progress: 61%. Estimated remaining time: 19 seconds.</code></pre>
 <pre class="r"><code># find and print important variables
 importance &lt;- sort(rf_model$variable.importance, decreasing = TRUE)
 print(importance)</code></pre>
 <pre><code>##                EXT_SOURCE_3                EXT_SOURCE_2 
-##                 3895.746677                 3866.399306 
+##                 3915.331821                 3914.256113 
 ##                EXT_SOURCE_1                  DAYS_BIRTH 
-##                 1365.586668                  869.657190 
+##                 1371.953260                  932.734504 
 ##               DAYS_EMPLOYED             DAYS_ID_PUBLISH 
-##                  742.064117                  606.623182 
+##                  784.079700                  628.624043 
 ##      DAYS_LAST_PHONE_CHANGE             AMT_GOODS_PRICE 
-##                  579.290627                  560.823098 
-##                  AMT_CREDIT           DAYS_REGISTRATION 
-##                  531.594095                  518.724654 
-##                 AMT_ANNUITY         NAME_EDUCATION_TYPE 
-##                  506.803197                  450.432618 
+##                  606.893673                  562.112875 
+##                  AMT_CREDIT                 AMT_ANNUITY 
+##                  530.617750                  530.053620 
+##           DAYS_REGISTRATION         NAME_EDUCATION_TYPE 
+##                  510.023525                  473.922627 
 ##                  SK_ID_CURR            AMT_INCOME_TOTAL 
-##                  421.837129                  381.659742 
+##                  429.132643                  380.145040 
 ##  REGION_POPULATION_RELATIVE           ORGANIZATION_TYPE 
-##                  361.571581                  309.768732 
-##     HOUR_APPR_PROCESS_START            NAME_INCOME_TYPE 
-##                  286.260064                  251.891228 
-##                 GENDER_MALE                 OWN_CAR_AGE 
-##                  250.751538                  231.971537 
-##  AMT_REQ_CREDIT_BUREAU_YEAR             OCCUPATION_TYPE 
-##                  202.755715                  196.986546 
-## REGION_RATING_CLIENT_W_CITY    OBS_30_CNT_SOCIAL_CIRCLE 
-##                  186.127033                  176.224646 
-##    OBS_60_CNT_SOCIAL_CIRCLE        REGION_RATING_CLIENT 
-##                  173.364249                  167.692429 
-##    DEF_30_CNT_SOCIAL_CIRCLE  WEEKDAY_APPR_PROCESS_START 
-##                  143.888651                  135.568439 
-##             CNT_FAM_MEMBERS          NAME_FAMILY_STATUS 
-##                  128.743842                  122.299452 
-##    DEF_60_CNT_SOCIAL_CIRCLE           NAME_HOUSING_TYPE 
-##                  118.358306                  114.561148 
-##      REG_CITY_NOT_WORK_CITY      REG_CITY_NOT_LIVE_CITY 
-##                  106.717816                  105.883047 
-##                CNT_CHILDREN                IMPUTED_EXT3 
-##                   98.852907                   98.164698 
-##                IMPUTED_EXT1   AMT_REQ_CREDIT_BUREAU_QRT 
-##                   97.796600                   92.917808 
-##                   CASH_LOAN              FLAG_EMP_PHONE 
-##                   78.031508                   77.471944 
-##                FLAG_OWN_CAR   AMT_REQ_CREDIT_BUREAU_MON 
-##                   76.889221                   75.370252 
+##                  364.088854                  313.538331 
+##     HOUR_APPR_PROCESS_START                 GENDER_MALE 
+##                  295.323537                  264.774400 
+##            NAME_INCOME_TYPE                 OWN_CAR_AGE 
+##                  249.771147                  232.336864 
+## REGION_RATING_CLIENT_W_CITY             OCCUPATION_TYPE 
+##                  206.702786                  205.551901 
+##  AMT_REQ_CREDIT_BUREAU_YEAR        REGION_RATING_CLIENT 
+##                  190.947189                  185.535168 
+##    OBS_60_CNT_SOCIAL_CIRCLE    OBS_30_CNT_SOCIAL_CIRCLE 
+##                  168.415112                  167.207537 
+##  WEEKDAY_APPR_PROCESS_START          NAME_FAMILY_STATUS 
+##                  142.646987                  128.983164 
+##             CNT_FAM_MEMBERS    DEF_30_CNT_SOCIAL_CIRCLE 
+##                  124.026587                  115.013984 
+##      REG_CITY_NOT_WORK_CITY           NAME_HOUSING_TYPE 
+##                  112.303368                  112.185588 
+##                IMPUTED_EXT1    DEF_60_CNT_SOCIAL_CIRCLE 
+##                  111.123783                  101.656638 
+##                CNT_CHILDREN   AMT_REQ_CREDIT_BUREAU_QRT 
+##                   96.543462                   93.817822 
+##                IMPUTED_EXT3      REG_CITY_NOT_LIVE_CITY 
+##                   92.989174                   92.067500 
+##                FLAG_OWN_CAR                   CASH_LOAN 
+##                   78.697777                   77.571704 
+##   AMT_REQ_CREDIT_BUREAU_MON              FLAG_EMP_PHONE 
+##                   74.760871                   67.619116 
 ##             NAME_TYPE_SUITE             FLAG_WORK_PHONE 
-##                   63.854844                   49.656597 
-##  AMT_REQ_CREDIT_BUREAU_WEEK     LIVE_CITY_NOT_WORK_CITY 
-##                   40.735971                   39.774908 
-##                  FLAG_PHONE             FLAG_OWN_REALTY 
-##                   39.704124                   38.886769 
-##   AMT_REQ_CREDIT_BUREAU_DAY                  FLAG_EMAIL 
-##                   30.142754                   27.653450 
-##  REG_REGION_NOT_WORK_REGION  REG_REGION_NOT_LIVE_REGION 
-##                   21.163138                   18.404872 
-## LIVE_REGION_NOT_WORK_REGION  AMT_REQ_CREDIT_BUREAU_HOUR 
-##                   18.375679                   15.292062 
+##                   65.391212                   48.951156 
+##     LIVE_CITY_NOT_WORK_CITY                  FLAG_PHONE 
+##                   43.432376                   43.258732 
+##             FLAG_OWN_REALTY  AMT_REQ_CREDIT_BUREAU_WEEK 
+##                   37.792319                   33.045423 
+##                  FLAG_EMAIL   AMT_REQ_CREDIT_BUREAU_DAY 
+##                   27.542693                   24.588493 
+##  REG_REGION_NOT_WORK_REGION LIVE_REGION_NOT_WORK_REGION 
+##                   24.001468                   21.919742 
+##  REG_REGION_NOT_LIVE_REGION  AMT_REQ_CREDIT_BUREAU_HOUR 
+##                   21.778973                   18.535071 
 ##            FLAG_CONT_MOBILE                IMPUTED_EXT2 
-##                    9.686116                    6.189295 
+##                    8.740591                    8.267135 
 ##                  FLAG_MOBIL 
 ##                    0.000000</code></pre>
 </div>
@@ -547,26 +488,26 @@ print(conf_matrix_train)</code></pre>
 ## 
 ##           Reference
 ## Prediction  FALSE   TRUE
-##      FALSE 146613   5860
-##      TRUE   51076  11503
+##      FALSE 147401   5838
+##      TRUE   50288  11525
 ##                                           
-##                Accuracy : 0.7352          
-##                  95% CI : (0.7334, 0.7371)
+##                Accuracy : 0.739           
+##                  95% CI : (0.7372, 0.7409)
 ##     No Information Rate : 0.9193          
 ##     P-Value [Acc &gt; NIR] : 1               
 ##                                           
-##                   Kappa : 0.1847          
+##                   Kappa : 0.1889          
 ##                                           
 ##  Mcnemar&#39;s Test P-Value : &lt;2e-16          
 ##                                           
-##             Sensitivity : 0.7416          
-##             Specificity : 0.6625          
-##          Pos Pred Value : 0.9616          
-##          Neg Pred Value : 0.1838          
+##             Sensitivity : 0.7456          
+##             Specificity : 0.6638          
+##          Pos Pred Value : 0.9619          
+##          Neg Pred Value : 0.1864          
 ##              Prevalence : 0.9193          
-##          Detection Rate : 0.6818          
-##    Detection Prevalence : 0.7090          
-##       Balanced Accuracy : 0.7021          
+##          Detection Rate : 0.6854          
+##    Detection Prevalence : 0.7126          
+##       Balanced Accuracy : 0.7047          
 ##                                           
 ##        &#39;Positive&#39; Class : FALSE           
 ## </code></pre>
@@ -585,26 +526,26 @@ print(conf_matrix_test)</code></pre>
 ## 
 ##           Reference
 ## Prediction FALSE  TRUE
-##      FALSE 62728  2860
-##      TRUE  21995  4581
+##      FALSE 62746  2948
+##      TRUE  21977  4493
 ##                                           
-##                Accuracy : 0.7303          
-##                  95% CI : (0.7274, 0.7332)
+##                Accuracy : 0.7296          
+##                  95% CI : (0.7267, 0.7324)
 ##     No Information Rate : 0.9193          
 ##     P-Value [Acc &gt; NIR] : 1               
 ##                                           
-##                   Kappa : 0.1639          
+##                   Kappa : 0.159           
 ##                                           
 ##  Mcnemar&#39;s Test P-Value : &lt;2e-16          
 ##                                           
-##             Sensitivity : 0.7404          
-##             Specificity : 0.6156          
-##          Pos Pred Value : 0.9564          
-##          Neg Pred Value : 0.1724          
+##             Sensitivity : 0.7406          
+##             Specificity : 0.6038          
+##          Pos Pred Value : 0.9551          
+##          Neg Pred Value : 0.1697          
 ##              Prevalence : 0.9193          
-##          Detection Rate : 0.6806          
-##    Detection Prevalence : 0.7116          
-##       Balanced Accuracy : 0.6780          
+##          Detection Rate : 0.6808          
+##    Detection Prevalence : 0.7128          
+##       Balanced Accuracy : 0.6722          
 ##                                           
 ##        &#39;Positive&#39; Class : FALSE           
 ## </code></pre>
@@ -615,7 +556,7 @@ print(conf_matrix_test)</code></pre>
 <pre class="r"><code># train RF for AUC calculation
 rf_AUC &lt;- ranger(formula = DEFAULT ~ ., data = credit_train_set, 
                    num.trees = 500, max.depth = 10, oob.error = TRUE, probability = TRUE, class.weights = class_weights, importance = &#39;impurity&#39;, seed = 1234)</code></pre>
-<pre><code>## Growing trees.. Progress: 60%. Estimated remaining time: 21 seconds.</code></pre>
+<pre><code>## Growing trees.. Progress: 66%. Estimated remaining time: 15 seconds.</code></pre>
 <pre class="r"><code># train probabilities
 probs_train &lt;- predict(rf_AUC, data = credit_train_set)$predictions[, 2]
 
@@ -633,7 +574,7 @@ auc_value_train &lt;- auc_perf_train@y.values[[1]]
 
 # print AUC value
 print(paste(&quot;AUC =&quot;, round(auc_value_train, 4)))</code></pre>
-<pre><code>## [1] &quot;AUC = 0.8076&quot;</code></pre>
+<pre><code>## [1] &quot;AUC = 0.8098&quot;</code></pre>
 </div>
 <div id="auc-test-set" class="section level1">
 <h1>AUC Test Set</h1>
@@ -654,19 +595,17 @@ auc_value_test &lt;- auc_perf_test@y.values[[1]]
 
 # print AUC value
 print(paste(&quot;AUC =&quot;, round(auc_value_test, 4)))</code></pre>
-<pre><code>## [1] &quot;AUC = 0.7435&quot;</code></pre>
+<pre><code>## [1] &quot;AUC = 0.7393&quot;</code></pre>
 </div>
 <div id="model-2" class="section level1">
 <h1>Model 2</h1>
 <pre class="r"><code># train RF with 800 trees and 20 depth
 rf_model1 &lt;- ranger(formula = DEFAULT ~ ., data = credit_train_set, , importance = &#39;impurity&#39;,
                    num.trees = 800, max.depth = 20, class.weights = class_weights, seed = 1234)</code></pre>
-<pre><code>## Growing trees.. Progress: 16%. Estimated remaining time: 2 minutes, 45 seconds.
-## Growing trees.. Progress: 32%. Estimated remaining time: 2 minutes, 9 seconds.
-## Growing trees.. Progress: 50%. Estimated remaining time: 1 minute, 31 seconds.
-## Growing trees.. Progress: 67%. Estimated remaining time: 1 minute, 2 seconds.
-## Growing trees.. Progress: 82%. Estimated remaining time: 35 seconds.
-## Growing trees.. Progress: 98%. Estimated remaining time: 4 seconds.</code></pre>
+<pre><code>## Growing trees.. Progress: 19%. Estimated remaining time: 2 minutes, 13 seconds.
+## Growing trees.. Progress: 40%. Estimated remaining time: 1 minute, 34 seconds.
+## Growing trees.. Progress: 62%. Estimated remaining time: 58 seconds.
+## Growing trees.. Progress: 85%. Estimated remaining time: 21 seconds.</code></pre>
 <pre class="r"><code># train predictions
 predictions_train1 &lt;- predict(rf_model1, credit_train_set)$predictions
 
@@ -680,26 +619,26 @@ print(conf_matrix_train1)</code></pre>
 ## 
 ##           Reference
 ## Prediction  FALSE   TRUE
-##      FALSE 194356   3637
-##      TRUE    3333  13726
+##      FALSE 194760   3638
+##      TRUE    2929  13725
 ##                                           
-##                Accuracy : 0.9676          
-##                  95% CI : (0.9668, 0.9683)
+##                Accuracy : 0.9695          
+##                  95% CI : (0.9687, 0.9702)
 ##     No Information Rate : 0.9193          
 ##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
 ##                                           
-##                   Kappa : 0.7799          
+##                   Kappa : 0.7904          
 ##                                           
-##  Mcnemar&#39;s Test P-Value : 0.0002842       
+##  Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
 ##                                           
-##             Sensitivity : 0.9831          
+##             Sensitivity : 0.9852          
 ##             Specificity : 0.7905          
-##          Pos Pred Value : 0.9816          
-##          Neg Pred Value : 0.8046          
+##          Pos Pred Value : 0.9817          
+##          Neg Pred Value : 0.8241          
 ##              Prevalence : 0.9193          
-##          Detection Rate : 0.9038          
-##    Detection Prevalence : 0.9207          
-##       Balanced Accuracy : 0.8868          
+##          Detection Rate : 0.9056          
+##    Detection Prevalence : 0.9226          
+##       Balanced Accuracy : 0.8878          
 ##                                           
 ##        &#39;Positive&#39; Class : FALSE           
 ## </code></pre>
@@ -710,39 +649,38 @@ print(conf_matrix_test1)</code></pre>
 ## 
 ##           Reference
 ## Prediction FALSE  TRUE
-##      FALSE 81829  6316
-##      TRUE   2894  1125
-##                                          
-##                Accuracy : 0.9001         
-##                  95% CI : (0.8981, 0.902)
-##     No Information Rate : 0.9193         
-##     P-Value [Acc &gt; NIR] : 1              
-##                                          
-##                   Kappa : 0.1481         
-##                                          
-##  Mcnemar&#39;s Test P-Value : &lt;2e-16         
-##                                          
-##             Sensitivity : 0.9658         
-##             Specificity : 0.1512         
-##          Pos Pred Value : 0.9283         
-##          Neg Pred Value : 0.2799         
-##              Prevalence : 0.9193         
-##          Detection Rate : 0.8879         
-##    Detection Prevalence : 0.9564         
-##       Balanced Accuracy : 0.5585         
-##                                          
-##        &#39;Positive&#39; Class : FALSE          
+##      FALSE 82097  6460
+##      TRUE   2626   981
+##                                           
+##                Accuracy : 0.9014          
+##                  95% CI : (0.8995, 0.9033)
+##     No Information Rate : 0.9193          
+##     P-Value [Acc &gt; NIR] : 1               
+##                                           
+##                   Kappa : 0.1318          
+##                                           
+##  Mcnemar&#39;s Test P-Value : &lt;2e-16          
+##                                           
+##             Sensitivity : 0.9690          
+##             Specificity : 0.1318          
+##          Pos Pred Value : 0.9271          
+##          Neg Pred Value : 0.2720          
+##              Prevalence : 0.9193          
+##          Detection Rate : 0.8908          
+##    Detection Prevalence : 0.9609          
+##       Balanced Accuracy : 0.5504          
+##                                           
+##        &#39;Positive&#39; Class : FALSE           
 ## </code></pre>
 </div>
 <div id="auc-train-set-2" class="section level1">
 <h1>AUC Train Set 2</h1>
 <pre class="r"><code># train AUC for 800 trees, 20 depth
 rf_AUC1 &lt;- ranger(formula = DEFAULT ~ ., data = credit_train_set, num.trees = 800, max.depth = 20, probability = TRUE, importance = &#39;impurity&#39;, class.weights = class_weights, seed = 1234)</code></pre>
-<pre><code>## Growing trees.. Progress: 18%. Estimated remaining time: 2 minutes, 21 seconds.
-## Growing trees.. Progress: 38%. Estimated remaining time: 1 minute, 42 seconds.
-## Growing trees.. Progress: 57%. Estimated remaining time: 1 minute, 10 seconds.
-## Growing trees.. Progress: 75%. Estimated remaining time: 42 seconds.
-## Growing trees.. Progress: 94%. Estimated remaining time: 9 seconds.</code></pre>
+<pre><code>## Growing trees.. Progress: 22%. Estimated remaining time: 1 minute, 47 seconds.
+## Growing trees.. Progress: 46%. Estimated remaining time: 1 minute, 13 seconds.
+## Growing trees.. Progress: 70%. Estimated remaining time: 40 seconds.
+## Growing trees.. Progress: 94%. Estimated remaining time: 8 seconds.</code></pre>
 <pre class="r"><code># probabilities
 probs_train1 &lt;- predict(rf_AUC1, data = credit_train_set)$predictions[, 2]
 
@@ -760,7 +698,7 @@ auc_value_train1 &lt;- auc_perf_train1@y.values[[1]]
 
 # print AUC value
 print(paste(&quot;AUC =&quot;, round(auc_value_train1, 4)))</code></pre>
-<pre><code>## [1] &quot;AUC = 0.9947&quot;</code></pre>
+<pre><code>## [1] &quot;AUC = 0.9952&quot;</code></pre>
 </div>
 <div id="auc-test-set-2" class="section level1">
 <h1>AUC Test Set 2</h1>
@@ -781,7 +719,689 @@ auc_value_test1 &lt;- auc_perf_test1@y.values[[1]]
 
 # print AUC value
 print(paste(&quot;AUC =&quot;, round(auc_value_test1, 4)))</code></pre>
-<pre><code>## [1] &quot;AUC = 0.7404&quot;</code></pre>
+<pre><code>## [1] &quot;AUC = 0.7369&quot;</code></pre>
+</div>
+<div id="smote-class-balance" class="section level1">
+<h1>SMOTE Class Balance</h1>
+<pre class="r"><code>application_train_smote %&gt;% pull(DEFAULT) %&gt;% table()</code></pre>
+<pre><code>## .
+##  FALSE   TRUE 
+## 282412 272844</code></pre>
+<pre class="r"><code>application_train_smote %&gt;% pull(DEFAULT) %&gt;% table() %&gt;% prop.table() %&gt;% round(2)</code></pre>
+<pre><code>## .
+## FALSE  TRUE 
+##  0.51  0.49</code></pre>
+</div>
+<div id="smote-data-partitioning" class="section level1">
+<h1>SMOTE Data Partitioning</h1>
+<pre class="r"><code># split data set
+creditinTrainsmote &lt;- createDataPartition(application_train_smote$DEFAULT, p=.7, list=FALSE)
+
+# train set
+credit_train_smote &lt;- application_train_smote[creditinTrainsmote,]
+
+# test set
+credit_test_smote &lt;- application_train_smote[-creditinTrainsmote,]</code></pre>
+</div>
+<div id="smote-training-the-random-forest" class="section level1">
+<h1>SMOTE Training the Random Forest</h1>
+<pre class="r"><code># convert target column to factor
+credit_train_smote$DEFAULT &lt;- as.factor(credit_train_smote$DEFAULT)
+credit_test_smote$DEFAULT &lt;- as.factor(credit_test_smote$DEFAULT)
+
+# train RF model with 500 trees, 10 depth
+rf_modelSMOTE &lt;- ranger(formula = DEFAULT ~ ., data = credit_train_smote, 
+                   num.trees = 500, max.depth = 10, oob.error = TRUE, , importance = &#39;impurity&#39;, seed = 1234)</code></pre>
+<pre><code>## Growing trees.. Progress: 13%. Estimated remaining time: 3 minutes, 26 seconds.
+## Growing trees.. Progress: 28%. Estimated remaining time: 2 minutes, 44 seconds.
+## Growing trees.. Progress: 43%. Estimated remaining time: 2 minutes, 7 seconds.
+## Growing trees.. Progress: 58%. Estimated remaining time: 1 minute, 34 seconds.
+## Growing trees.. Progress: 72%. Estimated remaining time: 1 minute, 1 seconds.
+## Growing trees.. Progress: 86%. Estimated remaining time: 30 seconds.</code></pre>
+<pre class="r"><code># find and print important variables
+importance_SMOTE &lt;- sort(rf_modelSMOTE$variable.importance, decreasing = TRUE)
+print(importance_SMOTE)</code></pre>
+<pre><code>##                                     GENDER_MALE.Y 
+##                                      7.444491e+03 
+##                                     GENDER_MALE.N 
+##                                      6.685673e+03 
+##                                      EXT_SOURCE_3 
+##                                      5.408013e+03 
+## NAME_EDUCATION_TYPE.Secondary...secondary.special 
+##                                      5.064758e+03 
+##                                    IMPUTED_EXT1.N 
+##                                      4.988043e+03 
+##                                    FLAG_OWN_CAR.Y 
+##                                      4.599549e+03 
+##                                    IMPUTED_EXT1.Y 
+##                                      4.534672e+03 
+##              NAME_EDUCATION_TYPE.Higher.education 
+##                                      4.476700e+03 
+##                                    FLAG_OWN_CAR.N 
+##                                      4.448189e+03 
+##                          REG_CITY_NOT_WORK_CITY.Y 
+##                                      4.195708e+03 
+##                                      EXT_SOURCE_2 
+##                                      3.862359e+03 
+##                          REG_CITY_NOT_WORK_CITY.N 
+##                                      3.693999e+03 
+##                        NAME_FAMILY_STATUS.Married 
+##                                      3.689392e+03 
+##                          NAME_INCOME_TYPE.Working 
+##                                      3.524069e+03 
+##                                      FLAG_PHONE.N 
+##                                      3.340081e+03 
+##                                      FLAG_PHONE.Y 
+##                                      3.254170e+03 
+##                                      EXT_SOURCE_1 
+##                                      2.304645e+03 
+##                         LIVE_CITY_NOT_WORK_CITY.Y 
+##                                      2.160710e+03 
+##                                   CNT_FAM_MEMBERS 
+##                                      2.126587e+03 
+##                         LIVE_CITY_NOT_WORK_CITY.N 
+##                                      2.093209e+03 
+##                              REGION_RATING_CLIENT 
+##                                      2.080974e+03 
+##                                    IMPUTED_EXT3.N 
+##                                      1.949196e+03 
+##                                 FLAG_OWN_REALTY.N 
+##                                      1.941928e+03 
+##                          OBS_30_CNT_SOCIAL_CIRCLE 
+##                                      1.933572e+03 
+##                          OBS_60_CNT_SOCIAL_CIRCLE 
+##                                      1.924480e+03 
+##                                 FLAG_OWN_REALTY.Y 
+##                                      1.898020e+03 
+##                       REGION_RATING_CLIENT_W_CITY 
+##                                      1.877450e+03 
+##             NAME_INCOME_TYPE.Commercial.associate 
+##                                      1.671184e+03 
+##                                    IMPUTED_EXT3.Y 
+##                                      1.659980e+03 
+##                          OCCUPATION_TYPE.Laborers 
+##                                      1.622203e+03 
+##                                       OWN_CAR_AGE 
+##                                      1.565750e+03 
+##                                      CNT_CHILDREN 
+##                                      1.548119e+03 
+##                     NAME_TYPE_SUITE.Unaccompanied 
+##                                      1.146839e+03 
+##                                 FLAG_WORK_PHONE.N 
+##                                      1.011400e+03 
+##                                 FLAG_WORK_PHONE.Y 
+##                                      1.009917e+03 
+##                        AMT_REQ_CREDIT_BUREAU_YEAR 
+##                                      9.868246e+02 
+##          ORGANIZATION_TYPE.Business.Entity.Type.3 
+##                                      9.637569e+02 
+##           NAME_FAMILY_STATUS.Single...not.married 
+##                                      9.252466e+02 
+##                          REG_CITY_NOT_LIVE_CITY.Y 
+##                                      8.178555e+02 
+##                 WEEKDAY_APPR_PROCESS_START.MONDAY 
+##                                      7.752334e+02 
+##                          REG_CITY_NOT_LIVE_CITY.N 
+##                                      7.689803e+02 
+##              WEEKDAY_APPR_PROCESS_START.WEDNESDAY 
+##                                      7.664687e+02 
+##                WEEKDAY_APPR_PROCESS_START.TUESDAY 
+##                                      7.431503e+02 
+##                            NAME_TYPE_SUITE.Family 
+##                                      5.959356e+02 
+##               WEEKDAY_APPR_PROCESS_START.THURSDAY 
+##                                      5.393774e+02 
+##                 NAME_FAMILY_STATUS.Civil.marriage 
+##                                      4.870037e+02 
+##                 WEEKDAY_APPR_PROCESS_START.FRIDAY 
+##                                      4.582626e+02 
+##                          DEF_30_CNT_SOCIAL_CIRCLE 
+##                                      4.403277e+02 
+##                           OCCUPATION_TYPE.Drivers 
+##                                      4.354296e+02 
+##                   ORGANIZATION_TYPE.Self.employed 
+##                                      4.195951e+02 
+##                               OCCUPATION_TYPE.XNA 
+##                                      4.125629e+02 
+##                       OCCUPATION_TYPE.Sales.staff 
+##                                      3.530636e+02 
+##                          DEF_60_CNT_SOCIAL_CIRCLE 
+##                                      2.644528e+02 
+##               NAME_HOUSING_TYPE.House...apartment 
+##                                      2.511268e+02 
+##                      NAME_FAMILY_STATUS.Separated 
+##                                      2.124115e+02 
+##                        REGION_POPULATION_RELATIVE 
+##                                      1.999970e+02 
+##               WEEKDAY_APPR_PROCESS_START.SATURDAY 
+##                                      1.906710e+02 
+##                          NAME_FAMILY_STATUS.Widow 
+##                                      1.855194e+02 
+##                    NAME_INCOME_TYPE.State.servant 
+##                                      1.732414e+02 
+##                        OCCUPATION_TYPE.Core.staff 
+##                                      1.687093e+02 
+##             NAME_EDUCATION_TYPE.Incomplete.higher 
+##                                      1.265142e+02 
+##                            DAYS_LAST_PHONE_CHANGE 
+##                                      1.219585e+02 
+##                      REG_REGION_NOT_WORK_REGION.N 
+##                                      9.229820e+01 
+##                                        DAYS_BIRTH 
+##                                      8.202299e+01 
+##                          OCCUPATION_TYPE.Managers 
+##                                      7.451275e+01 
+##                      REG_REGION_NOT_WORK_REGION.Y 
+##                                      6.004381e+01 
+##                    NAME_HOUSING_TYPE.With.parents 
+##                                      5.620894e+01 
+##                         AMT_REQ_CREDIT_BUREAU_MON 
+##                                      5.205232e+01 
+##                                     DAYS_EMPLOYED 
+##                                      5.136552e+01 
+##                                   DAYS_ID_PUBLISH 
+##                                      4.754036e+01 
+##                           HOUR_APPR_PROCESS_START 
+##                                      3.967130e+01 
+##                      REG_REGION_NOT_LIVE_REGION.N 
+##                                      3.939734e+01 
+##               NAME_EDUCATION_TYPE.Lower.secondary 
+##                                      3.714776e+01 
+##                     LIVE_REGION_NOT_WORK_REGION.N 
+##                                      3.489076e+01 
+##                     LIVE_REGION_NOT_WORK_REGION.Y 
+##                                      3.260822e+01 
+##                                  AMT_INCOME_TOTAL 
+##                                      2.977919e+01 
+##                      REG_REGION_NOT_LIVE_REGION.Y 
+##                                      2.973562e+01 
+##                                        AMT_CREDIT 
+##                                      2.937600e+01 
+##                                   AMT_GOODS_PRICE 
+##                                      2.905561e+01 
+##                                 DAYS_REGISTRATION 
+##                                      2.630463e+01 
+##                                      FLAG_EMAIL.Y 
+##                                      2.622571e+01 
+##                   NAME_TYPE_SUITE.Spouse..partner 
+##                                      2.534514e+01 
+##                                       AMT_ANNUITY 
+##                                      2.511945e+01 
+##                                      FLAG_EMAIL.N 
+##                                      2.425832e+01 
+##             NAME_HOUSING_TYPE.Municipal.apartment 
+##                                      2.240918e+01 
+##                         AMT_REQ_CREDIT_BUREAU_QRT 
+##                                      2.141124e+01 
+##                        NAME_INCOME_TYPE.Pensioner 
+##                                      1.911535e+01 
+##                NAME_HOUSING_TYPE.Rented.apartment 
+##                                      1.661527e+01 
+##                                  FLAG_EMP_PHONE.Y 
+##                                      1.607607e+01 
+##                           ORGANIZATION_TYPE.Other 
+##                                      1.580644e+01 
+##                             ORGANIZATION_TYPE.XNA 
+##                                      1.557004e+01 
+##                    OCCUPATION_TYPE.Security.staff 
+##                                      1.523310e+01 
+##                 WEEKDAY_APPR_PROCESS_START.SUNDAY 
+##                                      1.522241e+01 
+##          ORGANIZATION_TYPE.Business.Entity.Type.2 
+##                                      1.334574e+01 
+##                                  FLAG_EMP_PHONE.N 
+##                                      1.280340e+01 
+##                    ORGANIZATION_TYPE.Construction 
+##                                      1.209058e+01 
+##                       OCCUPATION_TYPE.Accountants 
+##                                      1.160384e+01 
+##             OCCUPATION_TYPE.High.skill.tech.staff 
+##                                      1.027786e+01 
+##                        ORGANIZATION_TYPE.Medicine 
+##                                      9.253402e+00 
+##                   ORGANIZATION_TYPE.Trade..type.7 
+##                                      8.839607e+00 
+##                          NAME_TYPE_SUITE.Children 
+##                                      7.177885e+00 
+##                        AMT_REQ_CREDIT_BUREAU_WEEK 
+##                                      6.396039e+00 
+##                      ORGANIZATION_TYPE.Government 
+##                                      5.756175e+00 
+##                     OCCUPATION_TYPE.Cooking.staff 
+##                                      5.673210e+00 
+##               ORGANIZATION_TYPE.Transport..type.4 
+##                                      5.656496e+00 
+##                    OCCUPATION_TYPE.Medicine.staff 
+##                                      5.498736e+00 
+##                    ORGANIZATION_TYPE.Kindergarten 
+##                                      5.023972e+00 
+##                   ORGANIZATION_TYPE.Trade..type.3 
+##                                      4.795816e+00 
+##                OCCUPATION_TYPE.Low.skill.Laborers 
+##                                      4.714950e+00 
+##                        ORGANIZATION_TYPE.Security 
+##                                      4.481458e+00 
+##               ORGANIZATION_TYPE.Transport..type.3 
+##                                      4.383485e+00 
+##                                       CASH_LOAN.N 
+##                                      4.378394e+00 
+##                          ORGANIZATION_TYPE.School 
+##                                      4.332550e+00 
+##                                       CASH_LOAN.Y 
+##                                      3.978249e+00 
+##          ORGANIZATION_TYPE.Business.Entity.Type.1 
+##                                      3.946746e+00 
+##                ORGANIZATION_TYPE.Industry..type.3 
+##                                      3.305940e+00 
+##                    OCCUPATION_TYPE.Cleaning.staff 
+##                                      3.299557e+00 
+##                      ORGANIZATION_TYPE.Restaurant 
+##                                      3.163058e+00 
+##                         AMT_REQ_CREDIT_BUREAU_DAY 
+##                                      3.046038e+00 
+##                           NAME_TYPE_SUITE.Other_B 
+##                                      3.030730e+00 
+##                          ORGANIZATION_TYPE.Postal 
+##                                      2.726748e+00 
+##                        AMT_REQ_CREDIT_BUREAU_HOUR 
+##                                      2.578747e+00 
+##              OCCUPATION_TYPE.Waiters.barmen.staff 
+##                                      2.320473e+00 
+##                     ORGANIZATION_TYPE.Agriculture 
+##                                      2.254574e+00 
+##                         ORGANIZATION_TYPE.Telecom 
+##                                      2.185969e+00 
+##                   ORGANIZATION_TYPE.Trade..type.2 
+##                                      2.168890e+00 
+##                            ORGANIZATION_TYPE.Bank 
+##                                      2.098756e+00 
+##                        ORGANIZATION_TYPE.Military 
+##                                      2.044563e+00 
+##                NAME_HOUSING_TYPE.Office.apartment 
+##                                      2.008419e+00 
+##                 NAME_HOUSING_TYPE.Co.op.apartment 
+##                                      1.789164e+00 
+##                          ORGANIZATION_TYPE.Police 
+##                                      1.764229e+00 
+##                         ORGANIZATION_TYPE.Housing 
+##                                      1.762673e+00 
+##                         ORGANIZATION_TYPE.Realtor 
+##                                      1.731531e+00 
+##                       OCCUPATION_TYPE.Secretaries 
+##                                      1.687042e+00 
+##                ORGANIZATION_TYPE.Industry..type.4 
+##                                      1.633106e+00 
+##                ORGANIZATION_TYPE.Industry..type.1 
+##                                      1.524414e+00 
+##             OCCUPATION_TYPE.Private.service.staff 
+##                                      1.486261e+00 
+##               ORGANIZATION_TYPE.Industry..type.11 
+##                                      1.428360e+00 
+##                ORGANIZATION_TYPE.Industry..type.7 
+##                                      1.423483e+00 
+##                           NAME_TYPE_SUITE.Other_A 
+##                                      1.415821e+00 
+##                                    IMPUTED_EXT2.Y 
+##                                      1.266612e+00 
+##                                    IMPUTED_EXT2.N 
+##                                      1.262543e+00 
+##                        ORGANIZATION_TYPE.Services 
+##                                      1.261261e+00 
+##                     OCCUPATION_TYPE.Realty.agents 
+##                                      1.259923e+00 
+##               ORGANIZATION_TYPE.Transport..type.2 
+##                                      1.252802e+00 
+##                ORGANIZATION_TYPE.Industry..type.9 
+##                                      1.238143e+00 
+##                          ORGANIZATION_TYPE.Mobile 
+##                                      1.184110e+00 
+##                   NAME_TYPE_SUITE.Group.of.people 
+##                                      1.177230e+00 
+##                       ORGANIZATION_TYPE.Insurance 
+##                                      1.150800e+00 
+##                   ORGANIZATION_TYPE.Trade..type.1 
+##                                      1.060392e+00 
+##                  ORGANIZATION_TYPE.Legal.Services 
+##                                      1.025855e+00 
+##                      ORGANIZATION_TYPE.University 
+##                                      9.743315e-01 
+##                ORGANIZATION_TYPE.Industry..type.5 
+##                                      9.693173e-01 
+##                   ORGANIZATION_TYPE.Trade..type.6 
+##                                      8.035085e-01 
+##                          OCCUPATION_TYPE.HR.staff 
+##                                      7.788360e-01 
+##                     ORGANIZATION_TYPE.Advertising 
+##                                      7.752790e-01 
+##                                FLAG_CONT_MOBILE.Y 
+##                                      7.474219e-01 
+##             ORGANIZATION_TYPE.Security.Ministries 
+##                                      7.448791e-01 
+##                         ORGANIZATION_TYPE.Culture 
+##                                      7.303800e-01 
+##                                FLAG_CONT_MOBILE.N 
+##                                      7.061707e-01 
+##                     ORGANIZATION_TYPE.Electricity 
+##                                      6.767039e-01 
+##                       ORGANIZATION_TYPE.Emergency 
+##                                      6.762616e-01 
+##                           ORGANIZATION_TYPE.Hotel 
+##                                      6.564189e-01 
+##                        ORGANIZATION_TYPE.Cleaning 
+##                                      6.155889e-01 
+##                        ORGANIZATION_TYPE.Religion 
+##                                      4.909636e-01 
+##               ORGANIZATION_TYPE.Industry..type.10 
+##                                      4.837548e-01 
+##                ORGANIZATION_TYPE.Industry..type.2 
+##                                      4.400813e-01 
+##                ORGANIZATION_TYPE.Industry..type.6 
+##                                      4.375614e-01 
+##                          OCCUPATION_TYPE.IT.staff 
+##                                      4.202654e-01 
+##               ORGANIZATION_TYPE.Transport..type.1 
+##                                      4.154291e-01 
+##               ORGANIZATION_TYPE.Industry..type.12 
+##                                      3.058339e-01 
+##                       NAME_INCOME_TYPE.Unemployed 
+##                                      2.847856e-01 
+##                   ORGANIZATION_TYPE.Trade..type.5 
+##                                      2.199512e-01 
+##               NAME_EDUCATION_TYPE.Academic.degree 
+##                                      1.509186e-01 
+##                  NAME_INCOME_TYPE.Maternity.leave 
+##                                      1.422529e-01 
+##               ORGANIZATION_TYPE.Industry..type.13 
+##                                      1.420683e-01 
+##                   ORGANIZATION_TYPE.Trade..type.4 
+##                                      8.897049e-02 
+##                ORGANIZATION_TYPE.Industry..type.8 
+##                                      7.190292e-02 
+##                          NAME_INCOME_TYPE.Student 
+##                                      2.666667e-03 
+##                      NAME_INCOME_TYPE.Businessman 
+##                                      0.000000e+00 
+##                        NAME_FAMILY_STATUS.Unknown 
+##                                      0.000000e+00</code></pre>
+</div>
+<div id="smote-predictions-on-train-data" class="section level1">
+<h1>SMOTE Predictions on Train Data</h1>
+<pre class="r"><code># predict classes on train data
+predictions_trainSMOTE &lt;- predict(rf_modelSMOTE, credit_train_smote)$predictions</code></pre>
+<div id="smote-train-metrics" class="section level2">
+<h2>SMOTE Train Metrics</h2>
+<pre class="r"><code># get confusion matrix
+conf_matrix_trainSMOTE &lt;- confusionMatrix(predictions_trainSMOTE, credit_train_smote$DEFAULT)
+print(conf_matrix_trainSMOTE)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction  FALSE   TRUE
+##      FALSE 197681  22499
+##      TRUE       8 168492
+##                                           
+##                Accuracy : 0.9421          
+##                  95% CI : (0.9414, 0.9428)
+##     No Information Rate : 0.5086          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.8839          
+##                                           
+##  Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
+##                                           
+##             Sensitivity : 1.0000          
+##             Specificity : 0.8822          
+##          Pos Pred Value : 0.8978          
+##          Neg Pred Value : 1.0000          
+##              Prevalence : 0.5086          
+##          Detection Rate : 0.5086          
+##    Detection Prevalence : 0.5665          
+##       Balanced Accuracy : 0.9411          
+##                                           
+##        &#39;Positive&#39; Class : FALSE           
+## </code></pre>
+</div>
+</div>
+<div id="smote-predictions-on-test-data" class="section level1">
+<h1>SMOTE Predictions on Test Data</h1>
+<pre class="r"><code># predict on test data
+predictions_testSMOTE &lt;- predict(rf_modelSMOTE, credit_test_smote)$predictions</code></pre>
+<div id="smote-test-metrics" class="section level2">
+<h2>SMOTE Test Metrics</h2>
+<pre class="r"><code># get confusion matrix
+conf_matrix_testSMOTE &lt;- confusionMatrix(predictions_testSMOTE, credit_test_smote$DEFAULT)
+print(conf_matrix_testSMOTE)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction FALSE  TRUE
+##      FALSE 84719  9659
+##      TRUE      4 72194
+##                                           
+##                Accuracy : 0.942           
+##                  95% CI : (0.9409, 0.9431)
+##     No Information Rate : 0.5086          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.8837          
+##                                           
+##  Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
+##                                           
+##             Sensitivity : 1.0000          
+##             Specificity : 0.8820          
+##          Pos Pred Value : 0.8977          
+##          Neg Pred Value : 0.9999          
+##              Prevalence : 0.5086          
+##          Detection Rate : 0.5086          
+##    Detection Prevalence : 0.5666          
+##       Balanced Accuracy : 0.9410          
+##                                           
+##        &#39;Positive&#39; Class : FALSE           
+## </code></pre>
+</div>
+</div>
+<div id="smote-auc-train-set" class="section level1">
+<h1>SMOTE AUC Train Set</h1>
+<pre class="r"><code># train RF for AUC calculation
+rf_AUCSMOTE &lt;- ranger(formula = DEFAULT ~ ., data = credit_train_smote, 
+                   num.trees = 500, max.depth = 10, oob.error = TRUE, probability = TRUE, importance = &#39;impurity&#39;, seed = 1234)</code></pre>
+<pre><code>## Growing trees.. Progress: 13%. Estimated remaining time: 3 minutes, 20 seconds.
+## Growing trees.. Progress: 28%. Estimated remaining time: 2 minutes, 41 seconds.
+## Growing trees.. Progress: 42%. Estimated remaining time: 2 minutes, 7 seconds.
+## Growing trees.. Progress: 57%. Estimated remaining time: 1 minute, 34 seconds.
+## Growing trees.. Progress: 72%. Estimated remaining time: 1 minute, 1 seconds.
+## Growing trees.. Progress: 86%. Estimated remaining time: 31 seconds.</code></pre>
+<pre class="r"><code># train probabilities
+probs_trainSMOTE &lt;- predict(rf_AUCSMOTE, data = credit_train_smote)$predictions[, 2]
+
+# train predictions
+pred_trainSMOTE &lt;- prediction(probs_trainSMOTE, credit_train_smote$DEFAULT)
+
+# train trp and fpr performance metrics
+perf_trainSMOTE &lt;- performance(pred_trainSMOTE, measure = &quot;tpr&quot;, x.measure = &quot;fpr&quot;)
+
+# train AUC performance
+auc_perf_trainSMOTE &lt;- performance(pred_trainSMOTE, measure = &quot;auc&quot;)
+
+# train AUC calculation
+auc_value_trainSMOTE &lt;- auc_perf_trainSMOTE@y.values[[1]]
+
+# print AUC value
+print(paste(&quot;AUC =&quot;, round(auc_value_trainSMOTE, 4)))</code></pre>
+<pre><code>## [1] &quot;AUC = 0.9738&quot;</code></pre>
+</div>
+<div id="smote-auc-test-set" class="section level1">
+<h1>SMOTE AUC Test Set</h1>
+<pre class="r"><code># test test probabilities
+probs_testSMOTE &lt;- predict(rf_AUCSMOTE, data = credit_test_smote)$predictions[, 2]
+
+# test set predictions
+pred_testSMOTE &lt;- prediction(probs_testSMOTE, credit_test_smote$DEFAULT)
+
+# test set tpr and fpr performance
+perf_testSMOTE &lt;- performance(pred_testSMOTE, measure = &quot;tpr&quot;, x.measure = &quot;fpr&quot;)
+
+# test set AUC performance
+auc_perf_testSMOTE &lt;- performance(pred_testSMOTE, measure = &quot;auc&quot;)
+
+# test set AUC calculation
+auc_value_testSMOTE &lt;- auc_perf_testSMOTE@y.values[[1]]
+
+# print AUC value
+print(paste(&quot;AUC =&quot;, round(auc_value_testSMOTE, 4)))</code></pre>
+<pre><code>## [1] &quot;AUC = 0.9714&quot;</code></pre>
+</div>
+<div id="smote-model-2" class="section level1">
+<h1>SMOTE Model 2</h1>
+<pre class="r"><code># train RF with 800 trees and 20 depth
+rf_model1smote &lt;- ranger(formula = DEFAULT ~ ., data = credit_train_smote, , importance = &#39;impurity&#39;,
+                   num.trees = 800, max.depth = 20, seed = 1234)</code></pre>
+<pre><code>## Growing trees.. Progress: 5%. Estimated remaining time: 11 minutes, 20 seconds.
+## Growing trees.. Progress: 10%. Estimated remaining time: 9 minutes, 53 seconds.
+## Growing trees.. Progress: 16%. Estimated remaining time: 8 minutes, 38 seconds.
+## Growing trees.. Progress: 21%. Estimated remaining time: 8 minutes, 1 seconds.
+## Growing trees.. Progress: 27%. Estimated remaining time: 7 minutes, 18 seconds.
+## Growing trees.. Progress: 32%. Estimated remaining time: 6 minutes, 48 seconds.
+## Growing trees.. Progress: 38%. Estimated remaining time: 6 minutes, 11 seconds.
+## Growing trees.. Progress: 43%. Estimated remaining time: 5 minutes, 37 seconds.
+## Growing trees.. Progress: 49%. Estimated remaining time: 5 minutes, 1 seconds.
+## Growing trees.. Progress: 55%. Estimated remaining time: 4 minutes, 26 seconds.
+## Growing trees.. Progress: 60%. Estimated remaining time: 3 minutes, 55 seconds.
+## Growing trees.. Progress: 66%. Estimated remaining time: 3 minutes, 19 seconds.
+## Growing trees.. Progress: 71%. Estimated remaining time: 2 minutes, 48 seconds.
+## Growing trees.. Progress: 77%. Estimated remaining time: 2 minutes, 15 seconds.
+## Growing trees.. Progress: 82%. Estimated remaining time: 1 minute, 42 seconds.
+## Growing trees.. Progress: 88%. Estimated remaining time: 1 minute, 10 seconds.
+## Growing trees.. Progress: 93%. Estimated remaining time: 38 seconds.
+## Growing trees.. Progress: 100%. Estimated remaining time: 2 seconds.</code></pre>
+<pre class="r"><code># train predictions
+predictions_train1smote &lt;- predict(rf_model1smote, credit_train_smote)$predictions
+
+# test predictions
+predictions_test1smote &lt;- predict(rf_model1smote, credit_test_smote)$predictions
+
+# conf matrix train
+conf_matrix_train1smote &lt;- confusionMatrix(predictions_train1smote, credit_train_smote$DEFAULT)
+print(conf_matrix_train1smote)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction  FALSE   TRUE
+##      FALSE 197689  16801
+##      TRUE       0 174190
+##                                           
+##                Accuracy : 0.9568          
+##                  95% CI : (0.9561, 0.9574)
+##     No Information Rate : 0.5086          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.9134          
+##                                           
+##  Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
+##                                           
+##             Sensitivity : 1.0000          
+##             Specificity : 0.9120          
+##          Pos Pred Value : 0.9217          
+##          Neg Pred Value : 1.0000          
+##              Prevalence : 0.5086          
+##          Detection Rate : 0.5086          
+##    Detection Prevalence : 0.5518          
+##       Balanced Accuracy : 0.9560          
+##                                           
+##        &#39;Positive&#39; Class : FALSE           
+## </code></pre>
+<pre class="r"><code># conf matrix train
+conf_matrix_test1smote &lt;- confusionMatrix(predictions_test1smote, credit_test_smote$DEFAULT)
+print(conf_matrix_test1smote)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction FALSE  TRUE
+##      FALSE 84723  7568
+##      TRUE      0 74285
+##                                           
+##                Accuracy : 0.9546          
+##                  95% CI : (0.9536, 0.9556)
+##     No Information Rate : 0.5086          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.909           
+##                                           
+##  Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
+##                                           
+##             Sensitivity : 1.0000          
+##             Specificity : 0.9075          
+##          Pos Pred Value : 0.9180          
+##          Neg Pred Value : 1.0000          
+##              Prevalence : 0.5086          
+##          Detection Rate : 0.5086          
+##    Detection Prevalence : 0.5540          
+##       Balanced Accuracy : 0.9538          
+##                                           
+##        &#39;Positive&#39; Class : FALSE           
+## </code></pre>
+</div>
+<div id="smote-auc-train-set-2" class="section level1">
+<h1>SMOTE AUC Train Set 2</h1>
+<pre class="r"><code># train AUC for 800 trees, 20 depth
+rf_AUC1smote &lt;- ranger(formula = DEFAULT ~ ., data = credit_train_smote, num.trees = 800, max.depth = 20, probability = TRUE, importance = &#39;impurity&#39;, seed = 1234)</code></pre>
+<pre><code>## Growing trees.. Progress: 5%. Estimated remaining time: 11 minutes, 20 seconds.
+## Growing trees.. Progress: 11%. Estimated remaining time: 9 minutes, 6 seconds.
+## Growing trees.. Progress: 16%. Estimated remaining time: 8 minutes, 24 seconds.
+## Growing trees.. Progress: 22%. Estimated remaining time: 7 minutes, 40 seconds.
+## Growing trees.. Progress: 28%. Estimated remaining time: 6 minutes, 59 seconds.
+## Growing trees.. Progress: 33%. Estimated remaining time: 6 minutes, 25 seconds.
+## Growing trees.. Progress: 39%. Estimated remaining time: 5 minutes, 57 seconds.
+## Growing trees.. Progress: 44%. Estimated remaining time: 5 minutes, 22 seconds.
+## Growing trees.. Progress: 50%. Estimated remaining time: 4 minutes, 48 seconds.
+## Growing trees.. Progress: 56%. Estimated remaining time: 4 minutes, 14 seconds.
+## Growing trees.. Progress: 61%. Estimated remaining time: 3 minutes, 46 seconds.
+## Growing trees.. Progress: 66%. Estimated remaining time: 3 minutes, 13 seconds.
+## Growing trees.. Progress: 72%. Estimated remaining time: 2 minutes, 43 seconds.
+## Growing trees.. Progress: 77%. Estimated remaining time: 2 minutes, 11 seconds.
+## Growing trees.. Progress: 83%. Estimated remaining time: 1 minute, 40 seconds.
+## Growing trees.. Progress: 88%. Estimated remaining time: 1 minute, 7 seconds.
+## Growing trees.. Progress: 94%. Estimated remaining time: 37 seconds.
+## Growing trees.. Progress: 100%. Estimated remaining time: 2 seconds.</code></pre>
+<pre class="r"><code># probabilities
+probs_train1smote &lt;- predict(rf_AUC1smote, data = credit_train_smote)$predictions[, 2]
+
+# predictions
+pred_train1smote &lt;- prediction(probs_train1smote, credit_train_smote$DEFAULT)
+
+# tpr and fpr
+perf_train1smote &lt;- performance(pred_train1smote, measure = &quot;tpr&quot;, x.measure = &quot;fpr&quot;)
+
+# auc performance
+auc_perf_train1smote &lt;- performance(pred_train1smote, measure = &quot;auc&quot;)
+
+# AUC calculation
+auc_value_train1smote &lt;- auc_perf_train1smote@y.values[[1]]
+
+# print AUC value
+print(paste(&quot;AUC =&quot;, round(auc_value_train1smote, 4)))</code></pre>
+<pre><code>## [1] &quot;AUC = 0.9987&quot;</code></pre>
+</div>
+<div id="smote-auc-test-set-2" class="section level1">
+<h1>SMOTE AUC Test Set 2</h1>
+<pre class="r"><code># probabilities
+probs_test1smote &lt;- predict(rf_AUC1smote, data = credit_test_smote)$predictions[, 2]
+
+# predictions
+pred_test1smote &lt;- prediction(probs_test1smote, credit_test_smote$DEFAULT)
+
+# tpr and fpr
+perf_test1smote &lt;- performance(pred_test1smote, measure = &quot;tpr&quot;, x.measure = &quot;fpr&quot;)
+
+# auc performance
+auc_perf_test1smote &lt;- performance(pred_test1smote, measure = &quot;auc&quot;)
+
+# AUC calculation
+auc_value_test1smote &lt;- auc_perf_test1smote@y.values[[1]]
+
+# print AUC value
+print(paste(&quot;AUC =&quot;, round(auc_value_test1smote, 4)))</code></pre>
+<pre><code>## [1] &quot;AUC = 0.9781&quot;</code></pre>
 </div>
 
 
