@@ -1,0 +1,68 @@
+---
+title: "Modeling for Default | Performance Summary"
+subtitle: "A summary of models evaluated to date and their performance modeling for default"
+author: "Adam Bushman"
+date: "2024-10-29"
+format:
+    html:
+        embed-resources: true
+execute:
+    warning: false
+---
+
+```{r}
+library('tidyverse')
+```
+
+Let's read in all the results of the various models we've experimented with.
+
+```{r}
+mcb1 <- read.csv('majority-class-baseline/model-results.csv')
+mcb2 <- read.csv('majority-class-baseline/model-results.csv')
+```
+
+We then combine them into a single data frame we can use for plotting.
+
+```{r}
+full_results <- 
+    bind_rows(
+        mcb1, 
+        mcb2
+    )
+
+full_results
+```
+
+Let's generate a basic, comparison plot across the various measures.
+
+```{r}
+ggplot(
+    pivot_longer(
+        full_results, 
+        cols = -c(model, hyperparameters)
+    ), 
+    aes(x = "1", y = value, label = model)
+) +
+    geom_label(
+        aes(fill = model), 
+        size = 2.5, 
+        show.legend = FALSE
+    ) +
+    facet_wrap(~name, nrow = 1) +
+    labs(
+        title = "Modeling for default", 
+        subtitle = "A summary of model performance"
+    ) +
+    theme_minimal() +
+    theme(
+        plot.title = element_text(face = "bold"), 
+        plot.subtitle = element_text(face = "italic"), 
+        axis.title.y = element_blank(), 
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(), 
+        strip.text = element_text(face = "bold", color = "white"), 
+        strip.background = element_rect(fill = "#707271", color = NA), 
+        panel.background = element_rect(fill = NA, color = "black"), 
+        panel.grid.major.x = element_blank()
+    )
+```
