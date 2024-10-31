@@ -25,8 +25,8 @@ library(pROC)
 
 application_train_clean <- as.data.frame(fread("data/application_train_clean.csv"))
 application_test_clean <- as.data.frame(fread("data/application_test_clean.csv"))
- 
-str(application_train_clean)
+
+application_train_smote <- as.data.frame(fread("data/application_train_smote.csv"))
 ```
 
 # Class Balance
@@ -353,6 +353,7 @@ auc_value_train1smote <- auc_perf_train1smote@y.values[[1]]
 
 # print AUC value
 print(paste("AUC =", round(auc_value_train1smote, 4)))
+
 ```
 
 # SMOTE AUC Test Set 2
