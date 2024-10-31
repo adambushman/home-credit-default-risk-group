@@ -1,0 +1,145 @@
+---
+title: "Group 2 Modeling Submission"
+author: "Andy Spendlove"
+date: "2024-10-31"
+output: 
+  html_document:
+    toc: true          # Adds a table of contents
+    toc_depth: 3       # Sets depth of headers included in the TOC (optional)
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(caret)
+library(rsample)
+library(pROC)
+```
+
+
+
+# Introduction
+
+## Business Problem and Stakes
+
+Home Credit, a financial services company, aims to increase financial inclusion by offering loans to individuals with limited or no formal credit history. However, the absence of traditional credit data poses a challenge in assessing these borrowers’ repayment capacity accurately. To prevent financially vulnerable clients from being rejected or overburdened by unmanageable loans, Home Credit seeks a more reliable predictive model to determine loan applicants’ repayment abilities. This model will not only improve client satisfaction but will also support sustainable lending practices by minimizing loan defaults.
+
+## Analytics Approach
+
+To address the business need, our analytic objective was to develop a statistical model capable of predicting a borrower’s likelihood of repaying a loan, leveraging the data provided by Home Credit on Kaggle. This dataset includes demographic details and alternative data sources, such as telecommunications usage and transactional behavior. We began by cleaning and preparing the data, then applied several modeling techniques suited for this classification task—including elastic net regression, support vector machines, and random forest models. Finally, we compared the resulting performance metrics (AUC, accuracy, precision, and recall) to select the most accurate and robust model that best meets Home Credit's data requirements for predicting client repayment abilities. 
+
+This notebook provides a detailed outline of our collective thought process and the steps we took in data preparation, model development, and performance evaluation.
+
+
+
+# Data Preparation
+
+## Data Cleaning
+
+### Initial Cleaning
+
+```{r}
+
+```
+
+### Data Balancing using SMOTE
+
+```{r}
+
+```
+
+
+## Setting a Majority Class Baseline
+
+Before testing various models, we first established an analytical baseline using a simple model that predicts solely based on the majority class. In this case, since "non-default" is the most common outcome in the target variable, our baseline model predicts "non-default" for all cases. This approach established a benchmark for performance metrics such as precision, accuracy, and recall, enabling us to evaluate whether the more complex, fine-tuned models developed in the next phase improved upon the baseline’s simplistic, majority-based predictions.
+
+More specifically, we created two majority class baseline models: one based on our initial imbalanced, cleaned data and another based on the more balanced, cleaned dataframe achieved through using SMOTE.
+
+```{r}
+# Read in imbalanced, cleaned data
+imbal_data <- data.table::fread('D:/All Repos/home-credit-default-risk-group/data/application_train_clean.csv') |>
+    as.data.frame() |>
+    mutate(DEFAULT = ifelse(DEFAULT,1,0))
+
+# Read in balanced data
+bal_data <- data.table::fread('D:/All Repos/home-credit-default-risk-group/data/application_train_smote.csv') |>
+    as.data.frame() |>
+    mutate(DEFAULT = ifelse(DEFAULT == 'Y',1,0))
+```
+
+Starting with the imbalanced data, we set the predicted value to 0 (non-default) and created a confusion matrix and summary statistics.
+
+```{r}
+# Set predicted value to 0 (non-default)
+imbal_data$pred <- 0
+
+# Create confusion matrix
+mat1 <- caret::confusionMatrix(factor(imbal_data$pred), factor(imbal_data$DEFAULT))
+
+# Calculate summary statistics
+roc_obj1 <- pROC::roc(imbal_data$DEFAULT, imbal_data$pred)
+auc_val1 <- pROC::auc(roc_obj1)
+
+# Create sumamrizing vector "performance1"
+performance1 <- c(
+    c("model" = "Majority Class, Imbalanced"), 
+    c("hyperparameters" = "None"), 
+    mat1$overall[c("Accuracy")], 
+    mat1$byClass[c("Precision", "Recall")], 
+    c("AUC" = auc_val1)
+)
+
+performance1
+```
+
+
+
+
+# Modeling Process
+
+## Elastic Net Regression
+
+```{r}
+
+```
+
+
+## Support Vector Machines
+
+```{r}
+
+```
+
+
+## Random Forest
+
+```{r}
+
+```
+
+
+
+
+# Modeling Performance
+
+## Model Comparison
+
+```{r}
+
+```
+
+
+## Performance Metrics for Best Model
+
+```{r}
+
+```
+
+
+
+# Results
+
+
+
+
+
