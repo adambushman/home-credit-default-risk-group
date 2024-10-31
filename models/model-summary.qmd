@@ -20,22 +20,7 @@ Let's read in all the results of the various models we've experimented with.
 mcb1 <- read.csv('majority-class-baseline/model-results.csv')
 elas <- read.csv('penalized-regression/model-results.csv')
 svm <- read.csv('support-vector-machine/model-results.csv')
-rf1 <- data.frame(
-    model = "Random Forest, 1", 
-    hyperparameters = "Trees = 500, Depth = 10", 
-    Accuracy = 0.942, 
-    Precision = 0.8984, 
-    Recall = 0.9999, 
-    AUC = 0.98
-)
-rf2 <- data.frame(
-    model = "Random Forest, 2", 
-    hyperparameters = "Trees = 800, Depth = 20", 
-    Accuracy = 0.9542, 
-    Precision = 0.9173, 
-    Recall = 0.9128, 
-    AUC = 0.98
-)
+rf <- read.csv('random-forest/model-results.csv')
 ```
 
 We then combine them into a single data frame we can use for plotting.
@@ -43,7 +28,7 @@ We then combine them into a single data frame we can use for plotting.
 ```{r}
 full_results <- 
     bind_rows(
-        mcb1, elas, svm, rf1, rf2
+        mcb1, elas, svm, rf
     ) |>
     as_tibble()
 
