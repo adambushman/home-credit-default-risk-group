@@ -1,0 +1,76 @@
+---
+title: "Random Forest - Test Set"
+author: "Georgia Christodoulou"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(data.table)
+library(caret)
+library(ranger)
+```
+
+```{r}
+# Read in data
+application_train_smote <- as.data.frame(fread("data/application_train_smote.csv"))
+application_test_clean <- as.data.frame(fread("data/application_test_clean.csv"))
+
+# Confirm not the right column 
+ncol(application_train_smote)
+ncol(application_test_clean)
+
+# Transform 
+application_test_clean <-     application_test_clean |>    select(-SK_ID_CURR) |>    
+  mutate(across(where(is.character), ~factor(make.names(.))), across(where(is.logical), ~factor(ifelse(.,"Y","N"))))
+
+# Create dummies
+dummy <- dummyVars("~ .", application_test_clean)
+application_test_dummy <- data.frame(predict(dummy, application_test_clean))
+
+# About the right size
+ncol(application_test_dummy)
+
+# Get common column names
+cols_to_keep <- intersect(names(application_test_dummy), names(application_train_smote))
+
+# Finalize data sets
+application_train_full <- application_train_smote |> select(all_of(c(cols_to_keep, "DEFAULT")))
+application_test_full <- application_test_dummy |> select(all_of(c(cols_to_keep)))
+
+# Confirm sizing
+ncol(application_train_full)
+ncol(application_test_full)
+```
+
+# Random Forest Model Predictions
+```{r}
+# train RF with 800 trees and 20 depth
+rf_model_final <- ranger(formula = DEFAULT ~ ., data = application_train_full, , importance = 'impurity', num.trees = 800, max.depth = 20, seed = 1234)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+# Test Data Predictions
+```{r}
+# predict classes on test data set
+predictions_test_final <- predict(rf_model_final, application_test_full)$predictions
+```
+
+# Write Predictions to CSV
+```{r}
+# combine predictions with test data
+application_test_full$DEFAULT <- predictions_test_final
+
+# write to CSV file
+write.csv(predictions_test_final, "predictions_test_final.csv", row.names = FALSE)
+
+# prediction proportions
+application_test_full %>% pull(DEFAULT) %>% table()
+application_test_full %>% pull(DEFAULT) %>% table() %>% prop.table() %>% round(2)
+```
+
