@@ -9,6 +9,7 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
 ```{r}
+library(tidyr)
 library(tidyverse)
 library(data.table)
 library(caret)
@@ -24,8 +25,12 @@ application_test_clean <- as.data.frame(fread("data/application_test_clean.csv")
 ncol(application_train_smote)
 ncol(application_test_clean)
 
+# Retain unique ID
+SK_ID_CURR <- application_test_clean$SK_ID_CURR 
+
 # Transform 
-application_test_clean <-     application_test_clean |>    select(-SK_ID_CURR) |>    
+application_test_clean <- application_test_clean %>%   
+  select(-SK_ID_CURR) %>%   
   mutate(across(where(is.character), ~factor(make.names(.))), across(where(is.logical), ~factor(ifelse(.,"Y","N"))))
 
 # Create dummies
@@ -39,38 +44,37 @@ ncol(application_test_dummy)
 cols_to_keep <- intersect(names(application_test_dummy), names(application_train_smote))
 
 # Finalize data sets
-application_train_full <- application_train_smote |> select(all_of(c(cols_to_keep, "DEFAULT")))
-application_test_full <- application_test_dummy |> select(all_of(c(cols_to_keep)))
+application_train_full <- application_train_smote %>% select(all_of(c(cols_to_keep, "DEFAULT")))
+application_test_full <- application_test_dummy %>% select(all_of(c(cols_to_keep)))
 
 # Confirm sizing
 ncol(application_train_full)
 ncol(application_test_full)
 ```
 
+
 # Random Forest Model Predictions
 ```{r}
 # train RF with 800 trees and 20 depth
-rf_model_final <- ranger(formula = DEFAULT ~ ., data = application_train_full, , importance = 'impurity', num.trees = 800, max.depth = 20, seed = 1234)
+rf_model_final <- ranger(formula = DEFAULT ~ ., data = application_train_full, 
+                   num.trees = 800, max.depth = 20, oob.error = TRUE, probability = TRUE, importance = 'impurity', seed = 1234)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
-# Test Data Predictions
+# Test Data Probabilities
 ```{r}
-# predict classes on test data set
-predictions_test_final <- predict(rf_model_final, application_test_full)$predictions
+# probabilities on test data set
+prob_test_final <- predict(rf_model_final, application_test_full, type = "response")$predictions[,2]
+
+prob_test_final %>% round(2)
+
+# combine probabilities with IDs
+ID_probs <- data.frame(SK_ID_CURR, TARGET = prob_test_final)
 ```
 
-# Write Predictions to CSV
+# Write Probabilities to CSV
 ```{r}
-# combine predictions with test data
-application_test_full$DEFAULT <- predictions_test_final
-
 # write to CSV file
-write.csv(predictions_test_final, "predictions_test_final.csv", row.names = FALSE)
-
-# prediction proportions
-application_test_full %>% pull(DEFAULT) %>% table()
-application_test_full %>% pull(DEFAULT) %>% table() %>% prop.table() %>% round(2)
+write.csv(ID_probs, "credit_test_probabilities.csv", row.names = FALSE)
 ```
 
