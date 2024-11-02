@@ -14,6 +14,7 @@ library(tidyverse)
 library(caret)
 library(rsample)
 library(pROC)
+library(data.table)
 ```
 
 
@@ -36,30 +37,216 @@ This notebook provides a detailed outline of our collective thought process and 
 
 ## Data Cleaning
 
-### Initial Cleaning
+*((Note for team: Data compiled from main/Data Cleaning.Rmd))
+
+The data cleaning process began by reading in the raw data provided by Home Credit on Kaggle, and then examining the columns for any missing values, incorrect datatypes, and extraneous columns. We also examined the data for columns could be simplified, renamed, or whose values could be converted to booleans for easier use, as well as potential issues unique to critical variables, such as making sure our target binary variable was formatted correctly.
 
 ```{r}
+# Read in raw data provided by Home Credit on Kaggle
+application_train <- as.data.frame(fread("application_train.csv"))
+application_test <- as.data.frame(fread("application_test.csv"))
 
+# Examine the data
+glimpse(application_train)
 ```
 
-### Data Balancing using SMOTE
+*((Note for team: Should we write some additional code showing a more systematic approach to scanning the data for problems like missing variables, incorrect data types, etc? Or do we think explaining our process of visually examining the data is sufficient?))
+
+
+From examining the data, we found both general issues that needed to be addressed, such as converting character variables to factors and binary variables to boolean, as well as several specific issues unique to certain columns. These included removing a series of columns containing averages and modes related to applicants' housing that were irrelevant to our analysis, filtering out rows with non-standard gender codes, and imputing missing values in critical columns with appropriate defaults. Additionally, we ensured that all entries were consistent and formatted correctly to facilitate further analysis.
+
+Step by step details can be found in the comments of the following cleaning function we wrote:
 
 ```{r}
+application_cleaning <- function(data) {
+  # remove entire columns
+  data <- data[, !grepl("DOCUMENT|AVG|MODE|MEDI", names(data))]
 
+  # impute NA with 0 for specific columns
+  NA_0 <- grep("SOCIAL|BUREAU", names(data), value = TRUE)
+  for (col in NA_0) {
+    data[is.na(data[[col]]), col] <- 0
+  }
+
+  # remove XNA rows from CODE_GENDER
+  data <- data[data$CODE_GENDER != "XNA", ]
+  
+  # convert numeric variables with 2 unique values to boolean
+  for (col in names(data)) {
+    if (is.numeric(data[[col]]) && length(unique(data[[col]])) == 2) {
+      data[[col]] <- as.logical(data[[col]])
+    }
+  }
+  
+  # convert character variables with 2 unique values to boolean
+  data$NAME_CONTRACT_TYPE <- data$NAME_CONTRACT_TYPE == "Cash loans"
+  data$CODE_GENDER <- data$CODE_GENDER == "M"
+  data$FLAG_OWN_CAR <- data$FLAG_OWN_CAR == "Y"
+  data$FLAG_OWN_REALTY <- data$FLAG_OWN_REALTY == "Y"
+  
+  # change "TARGET" to "DEFAULT"
+  colnames(data)[colnames(data) == "TARGET"] <- "DEFAULT"
+  
+  # change "CODE_GENDER" to "GENDER_MALE"
+  colnames(data)[colnames(data) == "CODE_GENDER"] <- "GENDER_MALE"
+  
+  # change "NAME_CONTRACT_TYPE" to "CASH_LOAN"
+  colnames(data)[colnames(data) == "NAME_CONTRACT_TYPE"] <- "CASH_LOAN"
+  
+  # impute blanks with NA
+  data[data == ""] <- NA
+
+  # impute NAME_TYPE_SUITE with "Unaccompanied"
+  data$NAME_TYPE_SUITE[is.na(data$NAME_TYPE_SUITE)] <- "Unaccompanied"
+
+  # impute OCCUPATION_TYPE with XNA
+  data$OCCUPATION_TYPE[is.na(data$OCCUPATION_TYPE)] <- "XNA"
+
+  # convert all character columns to factors
+  data[sapply(data, is.character)] <- lapply(data[sapply(data, is.character)], factor)
+
+  # remove rows where FLAG_OWN_CAR = "Y" and OWN_CAR_AGE is NA
+  data <- data[!(data$FLAG_OWN_CAR == "Y" & is.na(data$OWN_CAR_AGE)), ]
+
+  # add 1 year to all non-NA values of OWN_CAR_AGE
+  data$OWN_CAR_AGE <- ifelse(!is.na(data$OWN_CAR_AGE), data$OWN_CAR_AGE + 1, data$OWN_CAR_AGE)
+
+  # replace remaining NAs in OWN_CAR_AGE with 0
+  data$OWN_CAR_AGE[is.na(data$OWN_CAR_AGE)] <- 0
+
+  # replace NAs in EXT columns with the mean or median of the column
+  # take mean of source 1 and median of source 2 and 3
+  ext1_mean <- mean(data$EXT_SOURCE_1, na.rm = TRUE)
+  ext2_med <- median(data$EXT_SOURCE_2, na.rm = TRUE)
+  ext3_med <- median(data$EXT_SOURCE_3, na.rm = TRUE)
+  
+  # add columns to indicate imputed or not
+  data$IMPUTED_EXT1 <- is.na(data$EXT_SOURCE_1)
+  data$IMPUTED_EXT2 <- is.na(data$EXT_SOURCE_2)
+  data$IMPUTED_EXT3 <- is.na(data$EXT_SOURCE_3)
+  
+  # replace NAs
+  data$EXT_SOURCE_1[is.na(data$EXT_SOURCE_1)] <- ext1_mean
+  data$EXT_SOURCE_2[is.na(data$EXT_SOURCE_2)] <- ext2_med
+  data$EXT_SOURCE_3[is.na(data$EXT_SOURCE_3)] <- ext3_med
+
+  # remove rows with any remaining NA values
+  data <- na.omit(data)
+
+  return(data)
+}
 ```
+
+We then applied the function to the train and test dataframes, saving them as new, cleaned dataframes, examined the results, and wrote them to our GitHub repository.
+
+```{r}
+# Apply the function to both the train and test data, saving as new, cleaned dataframes.
+application_train_clean <- application_cleaning(application_train)
+application_test_clean <- application_cleaning(application_test)
+
+glimpse(application_train_clean)
+```
+
+```{r}
+# Writing new, cleaned dataframes to repository
+fwrite(
+  application_train_clean, 
+  file = "data/application_train_clean.csv", 
+  row.names = FALSE
+)
+
+fwrite(
+  application_test_clean, 
+  file = "data/application_test_clean.csv", 
+  row.names = FALSE
+)
+```
+
+
+## Data Balancing
+
+We knew that data balancing would be an important step in our data preparation process, since many of the modeling methods we were interested in trying, such as elastic net regression and random forest, work best when training data is balanced with respect to the target variable, DEFAULT (meaning an even split of subjects between each of the target variable's two classes, FALSE and TRUE). So, after obtaining our cleaned data set, we examined the current balance in the training data.
+
+```{r}
+# Create proportion table for target variable, DEFAULT.
+table(application_train_clean$DEFAULT) |> prop.table()
+```
+
+The data turned out to be extremely imbalanced, with almost 92% of subjects being in the non-default ("FALSE") class. So, we made use of the Synthetic Minority Oversampling Technique (SMOTE), made available in the R package "smotefamily," to synthetically balance the data. This involved a bit of additional cleaning and reformatting of the dataframe, removing non-informative columns, formatting the data types correctly, and creating dummy variables via one-hot encoding for categorical features in the dataset.
+
+```{r}
+application_smote <- function(data) {
+  # CHECK FOR SINGLE VALUE COLUMNS
+  unique <- sapply(data, function(x) length(unique(x)))
+  remove_cols <- names(unique[unique == 1])
+
+  # FORMAT DATA
+  data_clean <- 
+      data |>
+      select(-all_of(remove_cols)) |> 
+      select(-SK_ID_CURR) |>
+      mutate(
+          DEFAULT = factor(DEFAULT), 
+          across(where(is.character) & -DEFAULT, ~factor(make.names(.))), 
+          across(where(is.logical), ~factor(ifelse(.,"Y","N")))
+      )
+
+  # CONFIRM IMBALANCE
+  print("---Old Balance---")
+  print(table(data_clean$DEFAULT) |> prop.table())
+
+  # ONE-HOT-ENCODE VARIABLES WITH {CARET}
+  dmy <- dummyVars("~ . -DEFAULT", data_clean)
+  data_dmy <- data.frame(predict(dmy, data_clean))
+
+  # APPLY SMOTE
+  smote_results <- SMOTE(
+      data_dmy, 
+      target = data_clean$DEFAULT
+  )
+
+  # EXTRACT SMOTE DATE
+  data_smote <- smote_results$data |>
+      mutate(DEFAULT = class) |>
+      select(-class)
+
+  # CONFIRM REBALANCE3
+  print("--- New Balance ---")
+  print(table(data_smote$DEFAULT) |> prop.table())
+
+  return(data_smote)
+}
+```
+
+```{r}
+application_train_smote <- application_smote(application_train_clean)
+```
+
+We were very happy with this near 50-50 split achieved from SMOTE, so we wrote this newly balanced dataframe to our repository.
+
+```{r}
+fwrite(
+  application_train_smote, 
+  file = "data/application_train_smote.csv", 
+  row.names = FALSE
+)
+```
+
 
 
 ## Setting a Majority Class Baseline
 
-Before testing various models, we first established an analytical baseline using a simple model that predicts solely based on the majority class. In this case, since "non-default" is the most common outcome in the target variable, our baseline model predicts "non-default" for all cases. This approach established a benchmark for performance metrics such as precision, accuracy, and recall, enabling us to evaluate whether the more complex, fine-tuned models developed in the next phase improved upon the baseline’s simplistic, majority-based predictions.
+((Notes for team: Code complied from main/models/majority-class-baseline/Adam Modeling.Rmd))
 
-More specifically, we created two majority class baseline models: one based on our initial imbalanced, cleaned data and another based on the more balanced, cleaned dataframe achieved through using SMOTE.
+Our last step of data preparation was to create a simple, "baseline" model, one which always predicts that each subject will simply fall into the majority class. Establishing this simplistic model allows us to evaluate whether the more complex, fine-tuned models developed in the next phase can improve upon the baseline’s majority-based predictions and achieve better performance metrics, such as precision, accuracy, and recall.
+
+We created two majority class baseline models: one based on our initial imbalanced, cleaned data and another based on the more balanced, cleaned dataframe achieved through using SMOTE.
 
 ```{r}
 # Read in imbalanced, cleaned data
-imbal_data <- data.table::fread('D:/All Repos/home-credit-default-risk-group/data/application_train_clean.csv') |>
+imbal_data <- data.table::fread('https://raw.githubusercontent.com/adambushman/home-credit-default-risk-group/main/data/application_train_clean.csv') |>
     as.data.frame() |>
-    mutate(DEFAULT = ifelse(DEFAULT,1,0))
+    mutate(DEFAULT = ifelse(DEFAULT, 1, 0))
 
 # Read in balanced data
 bal_data <- data.table::fread('D:/All Repos/home-credit-default-risk-group/data/application_train_smote.csv') |>
@@ -80,7 +267,7 @@ mat1 <- caret::confusionMatrix(factor(imbal_data$pred), factor(imbal_data$DEFAUL
 roc_obj1 <- pROC::roc(imbal_data$DEFAULT, imbal_data$pred)
 auc_val1 <- pROC::auc(roc_obj1)
 
-# Create sumamrizing vector "performance1"
+# Create summarizing vector "performance1"
 performance1 <- c(
     c("model" = "Majority Class, Imbalanced"), 
     c("hyperparameters" = "None"), 
@@ -92,10 +279,59 @@ performance1 <- c(
 performance1
 ```
 
+Then we replicated the process for the SMOTE-balanced data.
+
+```{r}
+# Set predicted value to 0 (non-default) for balanced data
+bal_data$pred <- 0
+
+# Create confusion matrix
+mat2 <- caret::confusionMatrix(factor(bal_data$pred), factor(bal_data$DEFAULT))
+
+# Calculate summary statistics
+roc_obj2 <- pROC::roc(bal_data$DEFAULT, bal_data$pred)
+auc_val2 <- pROC::auc(roc_obj2)
+
+# Create summarizing vector "performance2"
+performance2 <- c(
+    c("model" = "Majority Class, Balanced"), 
+    c("hyperparameters" = "None"), 
+    mat2$overall[c("Accuracy")], 
+    mat2$byClass[c("Precision", "Recall")], 
+    c("AUC" = auc_val2)
+)
+
+performance2
+```
+
+Lastly for this process, we entered these performance vectors into a dataframe and wrote it to a .CSV file for pooling and performance comparison with future models.
+
+```{r}
+# Rbind the two performance vectors (from the balanced and imbalanced majority classifier models) into a dataframe
+df <-
+    data.frame(as.list(performance1)) |>
+    rbind(
+        data.frame(as.list(performance2))
+    )
+
+df
+```
+
+```{r}
+# Write the dataframe into a .csv file in our model folder
+data.frame(as.list(df)) |> 
+    write.csv('models/majority-class-baseline-model-results.csv', row.names = FALSE)
+```
 
 
 
 # Modeling Process
+
+Now that the data was cleaned and prepared, we began the process of selecting the most appropriate modeling technique and then fitting the models with our training data.
+
+## Model Selection
+
+
 
 ## Elastic Net Regression
 
