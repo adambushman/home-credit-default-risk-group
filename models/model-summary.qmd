@@ -12,6 +12,7 @@ execute:
 
 ```{r}
 library('tidyverse')
+library('ggrepel')
 ```
 
 Let's read in all the results of the various models we've experimented with.
@@ -55,10 +56,13 @@ ggplot(
     full_results_long, 
     aes(x = "1", y = value, label = paste0(model, " (", round(value,2) ,")"))
 ) +
-    geom_label(
+    geom_point(
+        aes(color = model), 
+        show.legend = FALSE
+    ) +
+    geom_label_repel(
         aes(fill = model), 
-        position = "jitter", 
-        size = 2, 
+        size = 1.9, 
         show.legend = FALSE
     ) +
     facet_wrap(~name, nrow = 1) +
