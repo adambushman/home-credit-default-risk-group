@@ -415,7 +415,7 @@ Ultimately, we decided to train our data using three different modeling techniqu
 
 ## Elastic Net Logistic Regression
 
-### Final Preparation
+### Model Preparation
 
 Leveraging elastic net logistic regression in R using the `{glmnet}` package required different formatting of the data. In particular, we had to split the predictors into their own matrix and the target into its own vector. Additionally, to advance the speed of fitting the model, we took a 25% sample of the data. 
 
@@ -509,14 +509,14 @@ elas_net_results <- read.csv('models/penalized-regression/model-results.csv')
 t(elas_net_results)
 ```
 
-These results were decent, though we wanted to push AUC into the 0.8's if possible.
+These results were decent, though we were hoping to see AUC fall into the 0.8's. 
 
 
 ### Hyperparameter Tuning
 
-The above, initial model assumed a perfect 50-50 elastic net, but we hypothesized that a better tuned model could improve performance further. We first tried alpha tuning, testing several different values of alpha (the elastic net mix), while also reducing the number of folds to help with computational speed.
+The above, initial model assumed a perfect 50-50 elastic net, but we hypothesized that a better tuned model could improve performance further. We tried tuning alpha with various values and reducing the number of folds to save on computational time.
 
-```{r}
+```{r eval=FALSE}
 # Selection of different alpha values
 mix <- seq(0.2, 0.8, 0.2)
 results <- list()
@@ -541,19 +541,32 @@ names(results_df) <- c("mix", "AUC_lambda.min", "AUC_lambda.1se")
 results_df
 ```
 
-The resulting AUC values from tuning the alpha parameter showed only marginal differences, staying within the 0.763 to 0.765 range. Since adjusting the elastic net mix didn’t significantly impact performance, we next focused on adding interaction terms. The goal was to capture potential non-linear relationships between predictors, which might help the model identify complex patterns that a purely additive approach could miss. 
+The resulting AUC values from tuning the alpha parameter showed only marginal differences, staying within the 0.763 to 0.765 range. There really isn't more performance to plumb from tuning aditional hyperparameters.
+
+### Feature Engineering
+
+There's almost certainly some complex relationships to isolate. Because this method is from the OLS family of regression, we can specify some interaction terms with the goal of capturing potential non-linear relationships between predictors. 
 
 After considering our previous analysis of significant predictors *((do we want to be more specific? or rephrase)), we decided on adding interaction terms for the following pairs of variables:
 
 *((A certain AI friend of ours suggested adding some logic behind each interaction, i.e.:  - Credit amount with number of children and annuity amount to reflect potential financial strain,  - Last phone change with recent credit requests as a signal of recent financial changes or instability,  - Region rating with social circle default counts to incorporate regional and social risk factors,  - Credit with goods price and external scores to see if asset value and external ratings impact credit risk))
 
--CNT_CHILDREN and AMT_CREDIT
--AMT_ANNUITY and AMT_CREDIT
--DAYS_LAST_PHONE_CHANGE and AMT_REQ_CREDIT_BUREAU_DAY
--REGION_RATING_CLIENT_W_CITY and DEF_30_CNT_SOCIAL_CIRCLE
--AMT_REQ_CREDIT_BUREAU_DAY and AMT_CREDIT
--AMT_CREDIT and AMT_GOODS_PRICE
--EXT_SOURCE_# and IMPUTED_EXT#
+*   `CNT_CHILDREN` and `AMT_CREDIT`
+    *   Theory: the amount of credit given could vary by family size 
+*   `AMT_ANNUITY` and `AMT_CREDIT`
+    *   Theory: 
+*   `DAYS_LAST_PHONE_CHANGE` and `AMT_REQ_CREDIT_BUREAU_DAY`
+    *   Theory: timing of changes in phone plan may correlate to frequent credit checks
+*   `REGION_RATING_CLIENT_W_CITY` and `DEF_30_CNT_SOCIAL_CIRCLE`
+    *   Theory: regional differences should certainly vary those defaulting in one's social circle
+*   `AMT_REQ_CREDIT_BUREAU_DAY` and `AMT_CREDIT`
+    *   Theory: amount of credit being sought may vary based on frequent credit checks
+*   `AMT_CREDIT` and `AMT_GOODS_PRICE`
+    *   Theory: the amount of credit being sought may vary based on the cost of good
+*   `EXT_SOURCE_#` and `IMPUTED_EXT#`
+    *   Theory: in theory, credit scores from external sources may vary by imputed or non-imputed values
+
+We added these interaction terms, like so:
 
 ```{r, eval=FALSE}
 # Mutate the dataset to include chosen interaction terms
@@ -597,32 +610,15 @@ mod2 <- cv.glmnet(
     alpha = 0.5,          # Set elastic net mix parameter
     type.measure = "auc"  # Add AUC as performance metric
 )
-
-mod2
 ```
 
-The model achieved a slightly higher AUC of 0.783 with the optimal lambda (with the more conservative 1se lambda again being almost identical, 0.781). So, there was some improvement, with standard error also dropping, but complexity increased, going from 120 predictors in the model without interactions terms to 165, a 37% increase.
+The model achieved a slightly higher AUC of 0.783 with the optimal lambda (with the more conservative 1se lambda again being almost identical, 0.781). So, there was some improvement, with standard error also dropping, but complexity increased, going from 120 predictors in the model without interactions terms to 165, a 37% increase. That's probably not an ideal tradeoff.
 
-Lastly, we again examined which predictors were showing as important from this new model with interaction terms added.
+Upon examining the most important predictors of that model, we find that:
 
-```{r}
-# Extract coefficients and convert to a dataframe
-coef <- coef(mod2, "lambda.1se")
-coef_df <- as.data.frame(as.matrix(coef))
-coef_df$Predictor <- rownames(coef)
-colnames(coef_df)[1] <- "Coefficient"
-rownames(coef_df) <- NULL
+### Conclusion
 
-# Flag important predictors (i.e. non-zero coefficients) and sort descending by absolute coefficient size
-coef_df |>
-    select(Predictor, Coefficient) |>
-    mutate(Important_Flag = ifelse(Coefficient == 0, 0, 1)) |>
-    arrange(desc(abs(Coefficient)))
-```
-
-The resulting table showed that, of the new terms added, the interactions between the external sources and their imputed flags were significant and had high, negative coefficients. The interactions between credit and children and credit and annuity was also significant, though with very small coefficients.
-
-Ultimately, these two attempts at hyperparameter tuning resulted in marginal AUC improvement, often at the expense of increased model complexity. We concluded that, at least for the scope of this project, we were hitting a ceiling with this model technique's predictive ability for this data.
+Ultimately, attempts to tune hyperparameters and engineer more predictive relationships in the data yielded marginal performance improvements. There's clearly a ceiling for just how much a linear-based model can capture these complex relationships. 
 
 
 ## Support Vector Machines
