@@ -30,9 +30,19 @@ Home Credit, a financial services company, aims to increase financial inclusion 
 
 ## Analytics Approach
 
-To address the business need, our analytic objective was to develop a statistical model capable of predicting a borrower’s likelihood of repaying a loan, leveraging the data provided by Home Credit on Kaggle. This dataset includes demographic details and alternative data sources, such as telecommunications usage and transactional behavior. We began by cleaning and preparing the data, then applied several modeling techniques suited for this classification task—including elastic net regression, support vector machines, and random forest models. Finally, we compared the resulting performance metrics (AUC, accuracy, precision, and recall) to select the most accurate and robust model that best meets Home Credit's data requirements for predicting client repayment abilities. 
+To address the business need, the objective is to develop a statistical model capable of predicting a borrower’s likelihood of defaulting on a loan, leveraging the data provided by Home Credit on Kaggle. This dataset includes demographic details and alternative data sources, such as telecommunications usage and transactional behavior. 
 
-This notebook provides a detailed outline of our collective thought process and the steps we took in data preparation, model development, and performance evaluation.
+Meeting this objective required the following milestones:
+
+1.   Exploratory data analysis
+2.   Cleaning and preparing the data
+3.   Experimenting with classification teachniques, including elastic net logistic regression, support vector machines, and random forest classification
+4.   Tuning models to optimize performance in Area Under ROC curve (AUC)
+5.   Benchmarking tuned model performance against each other and the baseline (majority class classifier) using metrics like accuracy, precision, recall, and AUC.
+6.   Selection of the best model given performance and its natural balance with competing priorities such as runtime, computation intensity, and model complexity.
+7.   Finally, we fit the training data to the model and predicted probability for default on the testing data
+
+This notebook provides a detailed outline of our collective thought process and implementation of the steps above.
 
 NOTE: For ease of running and knitting this notebook, which contains several hundred lines of code, we've opted to use eval=FALSE in many data chunks that are time-intensive to run. For instance, our data cleaning function in the Data Preparation section of the notebook was not evaluated, and instead we read in and present the output of the resulting, cleaned dataframes.
 
@@ -44,13 +54,14 @@ NOTE: For ease of running and knitting this notebook, which contains several hun
 
 ### Examining Variables using Skimpy
 
-After importing the raw data provided by Home Credit via Kaggle, we began the data cleaning process in Python, making use of skimpy (as well as other packages such as duckdb, pandas, and scikit-learn) to quickly and concisely summarize and examine the raw data. Skimpy (as illustrated through the package's R counterpart, skimr, below) allowed us to quickly and easily identify issues that would require data cleaning, such as the number of missing values in each row, the number of unique values, and basic summary statistics like mean, min, and max for numeric variables.
+Exploratory data analysis was performed individually. Helpful packages such as `tidyverse`, `skimr`, and others made quick work of evaluating data completeness (by row and column), summary statistics (mean, min, etc), variable data type mismatches, features skewness, and more. All these points helped to evaluate how data cleaning would best support the modeling phase.
 
+Below is an example of the comprehensive summaries used to evaluate data cleaning steps.
 
 ```{r}
 # Read in raw data provided by Home Credit on Kaggle
-application_train <- as.data.frame(fread("application_train.csv"))
-application_test <- as.data.frame(fread("application_test.csv"))
+application_train <- as.data.frame(fread("data/application_train.csv"))
+application_test <- as.data.frame(fread("data/application_test.csv"))
 
 # Examine the data
 skim(application_train)
@@ -58,15 +69,36 @@ skim(application_train)
 
 ### Feature Engineering using PCA
 
-We also made use of PCA (principal component analysis) in Python (from sklearn.decomposition import PCA) to help in the process of feature engineering, identifying which variables to keep and which to potentially drop from the training data, to reduce dimensionality and increase the predictive power of the model's we'd go on to make. 
+The core dataset featured many variables, some tracking similar items (such as "dwelling" or "document" -related variables). These were analyzed using PCA (principal component analysis) in Python (`from sklearn.decomposition import PCA`); the idea was to capture the majority of the variance in fewer components (columns). This would reduce dimensionality and concentrate whatever predictive power remains in a simpler eventual model. 
 
-For categorical variables, an initial exploration was performed on the 20 FLAG_DOCUMENT_# features using PCA to assess dimensionality reduction. However, only 10% of the variance was captured by significant components, indicating PCA’s limited utility in this case. A logistic regression on all components showed minimal predictiveness, suggesting these document-related flags may not be useful standalone predictors. The various variables related to subjects housing (i.e. FLOORMAX, BASEMENTAREA_MEDI, etc.) were similarly found to be very poor predictors, with poor R2 values and high p-values when fit in a logistic regression model. 
+Initial analysis was performed on the 20 `FLAG_DOCUMENT_#` features. We found only 10% of the variance was captured by the first 5 significant components, indicating PCA’s limited utility in this case. A logistic regression on all components showed little to no predictive power, suggesting these document-related flags may not be useful predictors. 
+
+The various variables related to a subjects housing (i.e. `FLOORMAX`, `BASEMENTAREA_MEDI`, etc.) benefitted greatly from PCA; the first 5 principal components captured 87% of the variance from the original 14 columns. However, these variables are nearly 60% incomplete. Even among records without missing data, these variables showed very poor predictive power in a simple, logistic regression.
+
+### Additional Insights
+
+We found that a handful of categorical variables held substantial variance with the target variable. These included: `NAME_INCOME_TYPE`, `NAME_EDUCATION_TYPE`, `ORGANIZATION_TYPE`, and `OCCUPATION_TYPE`. Preserving these variables as factors was a big priority.
+
+Additionally, variables `EXT_SOURCE_#` related to credit worthiness scores from external sources. These also proved highly predictive so imputing missing values where needed took priority.
 
 ## Performing the Data Cleaning
 
-In summary, after the examining the data with skimpy and exploring variables with PCA, we decided to remove each of the FLAG_DOCUMENT variables and the housing-related variables (identified through words like MODE, MED, AVG) which weren't impacting the target variable during PCA; we imputed missing values with appropriate values in fields like EXT_SOURCE_, OWN_CAR_AGE, and AMT_REQ_CREDIT_BUREAU_X based on logical assumptions; and we assigned categorical values for missing entries in fields like NAME_TYPE_SUITE and OCCUPATION_TYPE. We also addressed a number of general issues, such as converting character variables to factors and binary variables to boolean.
+After this thorough exampination, we made the following data cleaning decisions:
 
-To perform this cleaning, we wrote this application_cleaning function in R:
+*    Remove each of the FLAG_DOCUMENT variables and the housing-related variables (identified through words like MODE, MED, AVG) 
+    *   *Theory: high dimensionality, data incompleteness, and low predictive power*
+*   Imputed missing values with appropriate values in fields like `EXT_SOURCE_`, `OWN_CAR_AGE`, and `AMT_REQ_CREDIT_BUREAU_X` based on logical assumptions
+    *   *Theory: NAs in `NAME_TYPE_SUITE` imputed as "Unaccompanied"; distribution among categorical levels made sense*
+    *   *Theory: NAs in `EXT_SOURCE_` were imputed with median due to skewness; accompanying features flagging records as imputed were generated*
+    *   *Theory: NAs in `OWN_CAR_AGE` were imputed as zero (0) indicating no years of car ownership; non-NAs were incremented by 1 to indicate X years of ownership*
+*   Assign categorical values for missing entries in fields like `NAME_TYPE_SUITE` and `OCCUPATION_TYPE`
+    *   *Theory: NAs in these variables were replaced with existing "miscellaneous"-related values, such as "XNA"*
+*   Cast variables as intended types:
+    *   Binary to type `<logical>`
+    *   Category to type `<factor>`
+    *   Others, where applicable
+
+To perform this cleaning, we wrote this `application_cleaning()` function in R:
 
 ```{r, eval=FALSE}
 application_cleaning <- function(data) {
@@ -148,7 +180,7 @@ application_cleaning <- function(data) {
 }
 ```
 
-We then applied the function to the train and test dataframes, saving them as new, cleaned dataframes, and examined the results with skim() and by calculating the % difference between the pre- and post-cleaned dataframes number of rows.
+We then applied the function to the train and test data sets, saving them as new, cleaned dataframes. We then examined the resulting objects with skim() and calculating the % difference between the pre- and post-cleaning dataframes.
 
 ```{r, eval=FALSE}
 # Apply the function to both the train and test data, saving as new, cleaned dataframes.
@@ -158,15 +190,14 @@ application_test_clean <- application_cleaning(application_test)
 
 ```{r, include=FALSE}
 # Read in raw data provided by Home Credit on Kaggle
-application_train_clean <- as.data.frame(fread("application_train_clean.csv"))
-application_test_clean <- as.data.frame(fread("application_test_clean.csv"))
+application_train_clean <- as.data.frame(fread("data/application_train_clean.csv"))
+application_test_clean <- as.data.frame(fread("data/application_test_clean.csv"))
 ```
 
 ```{r}
 # Examine cleaned dataframe to ensure cleaning was successful
 skim(application_train_clean)
 ```
-
 
 ```{r}
 # Calculate number of rows and columns
@@ -213,21 +244,25 @@ cat("Percentage of columns in application_test_clean compared to application_tes
 
 ```
 
-We removed only a small fraction of the total rows from each dataset during cleaning, but more than half of the columns were removed, which helps reduce the dimensionality of these fairly massive raw data files and making them much better prepared for use in modeling.
+We removed only a small fraction of the total rows from each dataset during cleaning, but removed more than half of the columns. Additionally, each row and column are complete (no missing values). This reduction of dimensionality make the data sets farmore  suited to the modeling task ahead.
 
 
 ## Data Balancing
 
-We initially took these cleaned dataframes, application_train_clean and application_test_clean, and began the process of modeling with them. However, after these models came out fairly weak in their predictive power (which will be covered in the Modeling Process section below), we realized how imbalanced the data was with respect to the target variable, DEFAUlT: 
+We initially took these cleaned dataframes, `application_train_clean` and `application_test_clean`, and began basic model exploration. However, it became clear that the imbalanced target class (`DEFAULT`) was limiting predictive power (covered in the Modeling Process section below).
+
+Below is the observed imbalance in `DEFAULT` from the cleaning data:
 
 ```{r}
 # Create proportion table for target variable, DEFAULT.
 table(application_train_clean$DEFAULT) |> prop.table()
 ```
 
-Almost 92% of subjects in the training set were in the non-default ("FALSE") class. It made sense, therefore, that the models we were making were coming out predictively weak, especially since our chosen methods (elastic net, SVM, and random forest) are known to work best with balanced data. 
+Almost 92% of subjects in the training set were in the non-default ("FALSE") class. It made sense, therefore, that the designed models were falling short in performance since the tendancy was to over classify for not-default. 
 
-So, we made use of the Synthetic Minority Oversampling Technique (SMOTE), made available in the R package "smotefamily," to synthetically balance the data. This involved a bit of additional cleaning and reformatting of the dataframe, removing non-informative columns, formatting the data types correctly, and creating dummy variables via one-hot encoding for categorical features in the dataset. We then examined the resulting balancing within the target variable.
+It was clear the next step was to balance the data. We made use of the *Synthetic Minority Oversampling Technique* (SMOTE), made available in the R package `{smotefamily}`, to synthetically balance the data. This involved extra formatting of the data, removing constant columns, formatting the data types propertly, and creating dummy variables via one-hot encoding for categorical features in the dataset. 
+
+This is the function that would process the `application_train_clean` data frame:
 
 ```{r, eval=FALSE}
 application_smote <- function(data) {
@@ -279,8 +314,10 @@ application_train_smote <- application_smote(application_train_clean)
 
 ```{r, include=FALSE}
 # Read in SMOTE-cleaned data, to illustrate results
-application_train_smote <- as.data.frame(fread("application_train_clean.csv"))
+application_train_smote <- as.data.frame(fread("data/application_train_smote.csv"))
 ```
+
+We then examined the resulting balancing within the target variable. 
 
 ```{r}
 # Create new proportion table for target variable, DEFAUL, from SMOTE-cleaned data
@@ -289,23 +326,28 @@ table(application_train_smote$DEFAULT) |> prop.table()
 
 This near-50-50 split achieved through SMOTE was a huge improvement over the initial imbalance in the target variable, and it indeed served to improve our models (which, again, is covered in detail below in the Modeling Process section of this notebook).
 
+```{r}
+dim(application_train_smote)
+```
+
+We see that dimensionality has changed dramatically. We have many more columns due to the one-hot-encoding and more rows. We have more records due to how SMOTE balances the data. It oversamples or draws from the minority class for extra records. This is expected and desired.
+
+With a fully formatted, balanced dataset, 
 
 
 ## Setting a Majority Class Baseline
 
-Our last step of data preparation was to create a simple, "baseline" model, one which always predicts that each subject will simply fall into the majority class. Establishing this simplistic model allows us to evaluate whether the more complex, fine-tuned models developed in the next phase can improve upon the baseline’s majority-based predictions and achieve better performance metrics, such as precision, accuracy, and recall.
+The final step in data preparation required deriving "baseline" performance. Per industry standard, this is done using the "majority class classifier", an assumption that the most common classification is assumed for each subject in the data set. The resulting performance allows for informed comparison against more complex, models developed in the next phase. The goal is for these models to best the performance of the "baseline" model. We evaluate such using AUC, accuracty, precision, and recall.
 
-We created two majority class baseline models: one based on our initial imbalanced, cleaned data and another based on the more balanced, cleaned dataframe achieved through using SMOTE. Starting with the imbalanced data, we set the predicted value to 0 (non-default) and created a confusion matrix and summary statistics.
+We created two majority class baseline models: one based on our initial imbalanced, cleaned data and another based on the more balanced, cleaned dataframe achieved through using SMOTE. Starting with the imbalanced data, we set the predicted value to `FALSE` (not default) and created a confusion matrix and summary statistics.
 
-
-**((Giving me an error, but might not matter with eval=FALSE))
-```{r, eval=FALSE}
+```{r}
 # Rename dataframes, for brevity and legibility
 imbal_data <- application_train_clean
 bal_data <- application_train_smote
 
-# Set predicted value to 0 (non-default)
-imbal_data$pred <- 0
+# Set predicted value to FALSE (non-default)
+imbal_data$pred <- FALSE
 
 # Create confusion matrix
 mat1 <- caret::confusionMatrix(factor(imbal_data$pred), factor(imbal_data$DEFAULT))
@@ -326,12 +368,11 @@ performance1 <- c(
 performance1
 ```
 
-
 Then we replicated the process for the SMOTE-balanced data.
 
-```{r, eval=FALSE}
-# Set predicted value to 0 (non-default) for balanced data
-bal_data$pred <- 0
+```{r}
+# Set predicted value to "N" (non-default) for balanced data
+bal_data$pred <- "N"
 
 # Create confusion matrix
 mat2 <- caret::confusionMatrix(factor(bal_data$pred), factor(bal_data$DEFAULT))
@@ -352,51 +393,33 @@ performance2 <- c(
 performance2
 ```
 
-Lastly for this process, we entered these performance vectors into a dataframe and wrote it to a .CSV file for pooling and performance comparison with future models.
-
-```{r, eval=FALSE}
-# Rbind the two performance vectors (from the balanced and imbalanced majority classifier models) into a dataframe
-df <-
-    data.frame(as.list(performance1)) |>
-    rbind(
-        data.frame(as.list(performance2))
-    )
-
-df
-```
-
-```{r, eval=FAlSE}
-# Write the dataframe into a .csv file in our model folder
-data.frame(as.list(df)) |> 
-    write.csv('models/majority-class-baseline-model-results.csv', row.names = FALSE)
-```
-
-
+These results were saved to a .CSV to combine with later model performance when we evaluate the spectrum of options (see "Model Performance" section below).
 
 
 # Modeling Process
 
-Now that the data was cleaned and prepared, we began the process of selecting the most appropriate modeling technique and then fitting the models with our training data.
+Now that the data was cleaned and prepared, we advanced our work in experimenting with different models. The process involved formatting the data properly, splitting the training data into train/test sets suitable for cross validation, and finding optimal hyperparameters for model tuning. Each model, using its best configuration, was evaluated on test data in accuracy, precision, recall, and AUC.
 
 ## Model Selection
 
-We considered each of the different modeling techniques that we've learned about and worked with both academically and professionally, considering which ones would be best suited for this unique classification problem involving a massive data set containing (even after extensive cleaning and feature engineering) hundreds of thousands of rows and dozens of possible predictor variables. Ultimately, we decided to train our data using three different modeling techniques that we believed would be well-suited for the task:
+We considered each of the different modeling techniques that we've learned about and worked with both academically and professionally, considering which ones would be best suited for this unique classification problem involving a massive data set containing (even after extensive cleaning and feature engineering) hundreds of thousands of rows and dozens of possible predictor variables. 
 
-1. Elastic Net Regression - Selected for its capability to effectively handle high-dimensional datasets like this one, elastic net regression performs variable selection and regularization simultaneously by combining the strengths of Lasso and Ridge penalties. We believed this would help mitigate overfitting and enhance generalizability, which seemed like potential major issues with a dataset of this size. Elastic net regression is also able to produce interpretable coefficient estimates, unlike some machine learning techniques, which could be crucial for the company in understanding the exact relationships between their data features and loan default.
+Ultimately, we decided to train our data using three different modeling techniques that we believed would be well-suited for the task:
 
-2. Support Vector Machines - Selected because it also excels in high-dimensional spaces, particularly in its ability to find the hyperplane that maximizes the margin between classes, making it potentially very powerful for distinguishing between borrowers who are likely to default and those who aren't. Its ability to be adapted using kernel functions was also appealing, since it could capture the potentially complex relationship between variables without requiring overly complicated, additional, manual variable transformations, which could threaten the interpretability of the model. 
+1. Elastic Net Logistic Regression - Selected for its capability to effectively handle high-dimensional datasets like this one, elastic net regression performs variable selection and regularization simultaneously by combining the strengths of Lasso and Ridge penalties. We believed this would help mitigate overfitting and enhance generalizability, which seemed like potential major issues with a dataset of this size. Elastic net regression is also able to produce interpretable coefficient estimates, unlike some machine learning techniques, which could be crucial for the company in understanding the exact relationships between their data features and loan default. It's also computationally efficient.
+
+2. Support Vector Machines - Selected because it also excels in high-dimensional spaces, particularly in its ability to find the hyperplane that maximizes the margin between classes, making it potentially very powerful for distinguishing between borrowers who are likely to default and those who aren't. Its ability to be adapted using kernel functions was also appealing, since it could capture the potentially complex relationship between variables without requiring overly complicated, additional, manual variable transformations, which could threaten the interpretability of the model. The volume of records (500K+) isn't optimal for SVM since it is a compuationally inefficient method.
 
 3. Random Forests - Selected for its effectiveness with classification problems specifically, as well as its ability to mitigate overfitting and enhance predictive accuracy through its use of multiple (often hundreds of) decision trees. This, again, is particularly advantageous for our model with its dozens of potential predictors. More than elastic net or SVM, random forest models are less sensitive to noise and outliers, of which there could still be many in this massive dataset. Also, importantly, Random Forest excels in managing both categorical and continuous variables, making it an ideal choice for analyzing the diverse types of data we are working with, such as demographic and transactional information.
 
 
-## Elastic Net Regression
+## Elastic Net Logistic Regression
 
-### Final Preparation
+### Model Preparation
 
-Before our first attempt at fitting elastic net regression, we did some additional necessary data preparation. First and importantly, we used a sample of 25% of the dataset, as we anticipated that the full dataset, comprising over 300,000 rows, could substantially hinder computational performance. Also, we split the predictors and target as required by glmnet, with the latter being in a vector and the former being cast as a matrix.
+Leveraging elastic net logistic regression in R using the `{glmnet}` package required different formatting of the data. In particular, we had to split the predictors into their own matrix and the target into its own vector. Additionally, to advance the speed of fitting the model, we took a 25% sample of the data. 
 
-*((Add in chunks showing how we tried to fit model to imbalanced data at first? Do we have that output saved still?))
-```{r}
+```{r eval=FALSE}
 set.seed(814)  # For replicability
 # Using SMOTE-balanced data, renaming for brevity
 data <- application_train_smote
@@ -416,8 +439,7 @@ test_sampl <- sample_n(
 )
 ```
 
-
-```{r}
+```{r eval=FALSE}
 # Split predictors and target for train data
 train_target <- train_sampl$DEFAULT
 train_predictors <- as.matrix(
@@ -433,7 +455,7 @@ test_predictors <- as.matrix(
 
 ### Fitting the model
 
-We then fit an elastic net model leveraging cross validation, using the default 10 folds and adding AUC to our output.
+We then fit an elastic net model leveraging cross validation, using the default 10 folds and specifying AUC as the measure to optimize and include in the output.
 
 ```{r, eval=FALSE}
 # Fit an elastic net model using cross-validation
@@ -444,34 +466,10 @@ mod1 <- cv.glmnet(
     alpha = 0.5,          # Set elastic net mix parameter
     type.measure = "auc"  # Add AUC as performance metric
 )
-
-mod1
-```
-This model achieved an AUC of 0.7655 with the optimal lambda (min) and selected 166 predictors, while a slightly more conservative lambda (1se) produced an AUC of 0.7646, with 120 selected predictors.
-
-*((Is this plot chunk possible, if the mod1 chunk isn't actually evaluated when knit?))
-```{r}
-# Simple plot of AUC against log lambda values
-plot(mod1)
-```
-We then examined which coefficients for the 1se model were significant, since it was very close to the absolute minimum in terms of performance:
-
-```{r, eval=FALSE}
-# Extract coefficients and convert to a dataframe
-coef <- coef(mod1, "lambda.1se")
-coef_df <- as.data.frame(as.matrix(coef))
-coef_df$Predictor <- rownames(coef)
-colnames(coef_df)[1] <- "Coefficient"
-rownames(coef_df) <- NULL
-
-# Flag important predictors (i.e. non-zero coefficients) and sort descending by absolute coefficient size
-coef_df |>
-    select(Predictor, Coefficient) |>
-    mutate(Important_Flag = ifelse(Coefficient == 0, 0, 1)) |>
-    arrange(desc(abs(Coefficient)))
 ```
 
-The result was that the external source variables (EXT_SOURCE_1, 2, 3) and two levels of the income type variable (Unemployed and Student) were highly important and significant
+Results of the optimal model (best AUC) and the conservative model (AUC within 1 standard error) were very, very similar. Using this model, we can predict default on the test data.
+
 
 ### Evaluating model on test data
 
@@ -502,17 +500,23 @@ mat1 <- confusionMatrix(
     # Convert the actual target values to a factor, classifying 'Y' as 1 and everything else as 0
     factor(ifelse(test_target == "Y", 1, 0), levels = c(1,0))
 )
-
-mat1
 ```
 
-The resulting confusion matrix showed an accuracy of 0.697, sensitivity of 0.793, specificity of 0.604, and precision (positive predictive value) of 0.659. The AUC, calculated with auc(roc_obj), came out again to 0.762. We saved these results into a vector, like we'd done with the balanced and imbalanced majority class baseline models, for future model comparison.
+The full performance results were saved to a dataframe for later comparison to other models. However, we can see the resulting performance of the elastic net here:
+
+```{r}
+elas_net_results <- read.csv('models/penalized-regression/model-results.csv')
+t(elas_net_results)
+```
+
+These results were decent, though we were hoping to see AUC fall into the 0.8's. 
+
 
 ### Hyperparameter Tuning
 
-The above, initial model assumed a perfect 50-50 elastic net, but we hypothesized that a better tuned model could improve performance further. We first tried alpha tuning, testing several different values of alpha (the elastic net mix), while also reducing the number of folds to help with computational speed.
+The above, initial model assumed a perfect 50-50 elastic net, but we hypothesized that a better tuned model could improve performance further. We tried tuning alpha with various values and reducing the number of folds to save on computational time.
 
-```{r}
+```{r eval=FALSE}
 # Selection of different alpha values
 mix <- seq(0.2, 0.8, 0.2)
 results <- list()
@@ -537,19 +541,32 @@ names(results_df) <- c("mix", "AUC_lambda.min", "AUC_lambda.1se")
 results_df
 ```
 
-The resulting AUC values from tuning the alpha parameter showed only marginal differences, staying within the 0.763 to 0.765 range. Since adjusting the elastic net mix didn’t significantly impact performance, we next focused on adding interaction terms. The goal was to capture potential non-linear relationships between predictors, which might help the model identify complex patterns that a purely additive approach could miss. 
+The resulting AUC values from tuning the alpha parameter showed only marginal differences, staying within the 0.763 to 0.765 range. There really isn't more performance to plumb from tuning aditional hyperparameters.
+
+### Feature Engineering
+
+There's almost certainly some complex relationships to isolate. Because this method is from the OLS family of regression, we can specify some interaction terms with the goal of capturing potential non-linear relationships between predictors. 
 
 After considering our previous analysis of significant predictors *((do we want to be more specific? or rephrase)), we decided on adding interaction terms for the following pairs of variables:
 
 *((A certain AI friend of ours suggested adding some logic behind each interaction, i.e.:  - Credit amount with number of children and annuity amount to reflect potential financial strain,  - Last phone change with recent credit requests as a signal of recent financial changes or instability,  - Region rating with social circle default counts to incorporate regional and social risk factors,  - Credit with goods price and external scores to see if asset value and external ratings impact credit risk))
 
--CNT_CHILDREN and AMT_CREDIT
--AMT_ANNUITY and AMT_CREDIT
--DAYS_LAST_PHONE_CHANGE and AMT_REQ_CREDIT_BUREAU_DAY
--REGION_RATING_CLIENT_W_CITY and DEF_30_CNT_SOCIAL_CIRCLE
--AMT_REQ_CREDIT_BUREAU_DAY and AMT_CREDIT
--AMT_CREDIT and AMT_GOODS_PRICE
--EXT_SOURCE_# and IMPUTED_EXT#
+*   `CNT_CHILDREN` and `AMT_CREDIT`
+    *   Theory: the amount of credit given could vary by family size 
+*   `AMT_ANNUITY` and `AMT_CREDIT`
+    *   Theory: 
+*   `DAYS_LAST_PHONE_CHANGE` and `AMT_REQ_CREDIT_BUREAU_DAY`
+    *   Theory: timing of changes in phone plan may correlate to frequent credit checks
+*   `REGION_RATING_CLIENT_W_CITY` and `DEF_30_CNT_SOCIAL_CIRCLE`
+    *   Theory: regional differences should certainly vary those defaulting in one's social circle
+*   `AMT_REQ_CREDIT_BUREAU_DAY` and `AMT_CREDIT`
+    *   Theory: amount of credit being sought may vary based on frequent credit checks
+*   `AMT_CREDIT` and `AMT_GOODS_PRICE`
+    *   Theory: the amount of credit being sought may vary based on the cost of good
+*   `EXT_SOURCE_#` and `IMPUTED_EXT#`
+    *   Theory: in theory, credit scores from external sources may vary by imputed or non-imputed values
+
+We added these interaction terms, like so:
 
 ```{r, eval=FALSE}
 # Mutate the dataset to include chosen interaction terms
@@ -593,32 +610,15 @@ mod2 <- cv.glmnet(
     alpha = 0.5,          # Set elastic net mix parameter
     type.measure = "auc"  # Add AUC as performance metric
 )
-
-mod2
 ```
 
-The model achieved a slightly higher AUC of 0.783 with the optimal lambda (with the more conservative 1se lambda again being almost identical, 0.781). So, there was some improvement, with standard error also dropping, but complexity increased, going from 120 predictors in the model without interactions terms to 165, a 37% increase.
+The model achieved a slightly higher AUC of 0.783 with the optimal lambda (with the more conservative 1se lambda again being almost identical, 0.781). So, there was some improvement, with standard error also dropping, but complexity increased, going from 120 predictors in the model without interactions terms to 165, a 37% increase. That's probably not an ideal tradeoff.
 
-Lastly, we again examined which predictors were showing as important from this new model with interaction terms added.
+Upon examining the most important predictors of that model, we find that:
 
-```{r}
-# Extract coefficients and convert to a dataframe
-coef <- coef(mod2, "lambda.1se")
-coef_df <- as.data.frame(as.matrix(coef))
-coef_df$Predictor <- rownames(coef)
-colnames(coef_df)[1] <- "Coefficient"
-rownames(coef_df) <- NULL
+### Conclusion
 
-# Flag important predictors (i.e. non-zero coefficients) and sort descending by absolute coefficient size
-coef_df |>
-    select(Predictor, Coefficient) |>
-    mutate(Important_Flag = ifelse(Coefficient == 0, 0, 1)) |>
-    arrange(desc(abs(Coefficient)))
-```
-
-The resulting table showed that, of the new terms added, the interactions between the external sources and their imputed flags were significant and had high, negative coefficients. The interactions between credit and children and credit and annuity was also significant, though with very small coefficients.
-
-Ultimately, these two attempts at hyperparameter tuning resulted in marginal AUC improvement, often at the expense of increased model complexity. We concluded that, at least for the scope of this project, we were hitting a ceiling with this model technique's predictive ability for this data.
+Ultimately, attempts to tune hyperparameters and engineer more predictive relationships in the data yielded marginal performance improvements. There's clearly a ceiling for just how much a linear-based model can capture these complex relationships. 
 
 
 ## Support Vector Machines
