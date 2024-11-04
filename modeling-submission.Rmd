@@ -811,13 +811,180 @@ No feature engineering was performed for this model. Thanks to the radial kernal
 While not perfectly suited to the problem (given the wealth of data), a Support Vector Machine model did well to generalize the training data and avoid overfitting. The resulting performance is very commendable and should provide a good competitor to other models that should do better (such as tree-based methods). 
 
 
+
 ## Random Forest
 
+For the Random Forest model, we initially used class weights as a balancing method. In the first Random Forest model using class weights, 500 trees, and a depth of 10, we observed a training set accuracy of 0.73, recall of 0.74, precision of 0.95, and an AUC of 0.81.  In the test set we observed similar results across all metrics.
+
+In effort to improve the AUC results, the number of trees was increased to 800 and the depth was increased to 20, which would be more appropriate for a data set of this size. In this model we observed an accuracy of 0.968, recall of 0.98, precision of 0.98, and an AUC 0.99. While these results are much more favorable and the test set resulted in similar accuracy, precision, and recall, the AUC results using the testing set was 0.74, implying a lot of overfitting in the model with the adjusted tree parameters. 
+
+While class weights can be a reliable balancing method, because we have a high dimensional data set, it is severely unbalanced, and most notably, this is a tree based model, the SMOTE balancing is much more appropriate. Similar to the rest of our models, we then used the SMOTE data set with the same tree parameters.
+
+### Data Partitioning
 ```{r}
+# split data set into training and testing sets
+creditinTrainsmote <- createDataPartition(application_train_smote$DEFAULT, p=.7, list=FALSE)
+
+# train set
+credit_train_smote <- application_train_smote[creditinTrainsmote,]
+
+# test set
+credit_test_smote <- application_train_smote[-creditinTrainsmote,]
+```
+
+### SMOTE Fitting the Random Forest Model
+```{r}
+# convert target column to factor
+credit_train_smote$DEFAULT <- as.factor(credit_train_smote$DEFAULT)
+credit_test_smote$DEFAULT <- as.factor(credit_test_smote$DEFAULT)
+
+# fit RF model with 500 trees, 10 depth
+rf_modelSMOTE <- ranger(formula = DEFAULT ~ ., data = credit_train_smote, 
+                   num.trees = 500, max.depth = 10, oob.error = TRUE, , importance = 'impurity', seed = 1234)
+
+# find and print important variables
+importance_SMOTE <- sort(rf_modelSMOTE$variable.importance, decreasing = TRUE)
+print(importance_SMOTE)
+```
+
+### SMOTE Model Predictions
+```{r}
+# predict on train data
+predictions_trainSMOTE <- predict(rf_modelSMOTE, credit_train_smote)$predictions
+
+# predict on test data
+predictions_testSMOTE <- predict(rf_modelSMOTE, credit_test_smote)$predictions
+```
+
+### SMOTE Model Confusion Matrix
+```{r}
+# get training set confusion matrix
+conf_matrix_trainSMOTE <- confusionMatrix(predictions_trainSMOTE, credit_train_smote$DEFAULT)
+print(conf_matrix_trainSMOTE)
+
+# get testing set confusion matrix
+conf_matrix_testSMOTE <- confusionMatrix(predictions_testSMOTE, credit_test_smote$DEFAULT)
+print(conf_matrix_testSMOTE)
+```
+
+### SMOTE AUC Train Set
+```{r}
+# fit RF for AUC calculation with 500 trees and 10 depth
+rf_AUCSMOTE <- ranger(formula = DEFAULT ~ ., data = credit_train_smote, 
+                   num.trees = 500, max.depth = 10, oob.error = TRUE, probability = TRUE, importance = 'impurity', seed = 1234)
+
+# train set probabilities
+probs_trainSMOTE <- predict(rf_AUCSMOTE, data = credit_train_smote)$predictions[, 2]
+
+# train set predictions
+pred_trainSMOTE <- prediction(probs_trainSMOTE, credit_train_smote$DEFAULT)
+
+# train set trp and fpr performance metrics
+perf_trainSMOTE <- performance(pred_trainSMOTE, measure = "tpr", x.measure = "fpr")
+
+# train set AUC performance
+auc_perf_trainSMOTE <- performance(pred_trainSMOTE, measure = "auc")
+
+# train set AUC calculation
+auc_value_trainSMOTE <- auc_perf_trainSMOTE@y.values[[1]]
+
+# print trsin set AUC value
+print(paste("AUC =", round(auc_value_trainSMOTE, 4)))
+```
+
+### SMOTE AUC Test Set
+```{r}
+# test set probabilities
+probs_testSMOTE <- predict(rf_AUCSMOTE, data = credit_test_smote)$predictions[, 2]
+
+# test set predictions
+pred_testSMOTE <- prediction(probs_testSMOTE, credit_test_smote$DEFAULT)
+
+# test set tpr and fpr performance
+perf_testSMOTE <- performance(pred_testSMOTE, measure = "tpr", x.measure = "fpr")
+
+# test set AUC performance
+auc_perf_testSMOTE <- performance(pred_testSMOTE, measure = "auc")
+
+# test set AUC calculation
+auc_value_testSMOTE <- auc_perf_testSMOTE@y.values[[1]]
+
+# print test set AUC value
+print(paste("AUC =", round(auc_value_testSMOTE, 4)))
+```
+
+Choosing 500 trees, and a depth of 10, we observed a training set accuracy of 0.94, recall of 1.0, precision of 0.88, and an AUC of 0.97.  In the test set we observed similar results across all metrics, implying that there isn’t overfitting in this model, but there could be improvements across all metrics.
+
+### SMOTE Model 2
+```{r}
+# fit RF with 800 trees and 20 depth
+rf_model1smote <- ranger(formula = DEFAULT ~ ., data = credit_train_smote, , importance = 'impurity',
+                   num.trees = 800, max.depth = 20, seed = 1234)
+
+# train set predictions
+predictions_train1smote <- predict(rf_model1smote, credit_train_smote)$predictions
+
+# test set predictions
+predictions_test1smote <- predict(rf_model1smote, credit_test_smote)$predictions
+
+# train set confusion matrix
+conf_matrix_train1smote <- confusionMatrix(predictions_train1smote, credit_train_smote$DEFAULT)
+print(conf_matrix_train1smote)
+
+# test set confusion matrix 
+conf_matrix_test1smote <- confusionMatrix(predictions_test1smote, credit_test_smote$DEFAULT)
+print(conf_matrix_test1smote)
+```
+
+### SMOTE AUC Train Set 2
+```{r}
+# fit for AUC calculation with 800 trees, 20 depth
+rf_AUC1smote <- ranger(formula = DEFAULT ~ ., data = credit_train_smote, num.trees = 800, max.depth = 20, probability = TRUE, importance = 'impurity', seed = 1234)
+
+# train set probabilities
+probs_train1smote <- predict(rf_AUC1smote, data = credit_train_smote)$predictions[, 2]
+
+# train set predictions
+pred_train1smote <- prediction(probs_train1smote, credit_train_smote$DEFAULT)
+
+# train set tpr and fpr
+perf_train1smote <- performance(pred_train1smote, measure = "tpr", x.measure = "fpr")
+
+# train set auc performance
+auc_perf_train1smote <- performance(pred_train1smote, measure = "auc")
+
+# train set AUC calculation
+auc_value_train1smote <- auc_perf_train1smote@y.values[[1]]
+
+# print train set AUC value
+print(paste("AUC =", round(auc_value_train1smote, 4)))
 
 ```
 
+### SMOTE AUC Test Set 2
+```{r}
+# test set probabilities
+probs_test1smote <- predict(rf_AUC1smote, data = credit_test_smote)$predictions[, 2]
 
+# test set predictions
+pred_test1smote <- prediction(probs_test1smote, credit_test_smote$DEFAULT)
+
+# set set tpr and fpr
+perf_test1smote <- performance(pred_test1smote, measure = "tpr", x.measure = "fpr")
+
+# test set auc performance
+auc_perf_test1smote <- performance(pred_test1smote, measure = "auc")
+
+# test set AUC calculation
+auc_value_test1smote <- auc_perf_test1smote@y.values[[1]]
+
+# print test set AUC value
+print(paste("AUC =", round(auc_value_test1smote, 4)))
+```
+
+Increasing the number of trees and depth to 800 trees, and a depth of 20, we observed an accuracy of 0.957, recall of 1.0, precision of 0.92, and an AUC 0.99. In the test set, we observed an accuracy of 0.955, recall of 1.0, precision of 0.92, and an AUC of 0.978. The AUC remained the same between the first and second model, but the accuracy and precision improved.
+
+We can see that the SMOTE balancing method was much more effective for this type of data set, showing good generalizability between both models. Additionally, increasing the number of trees and depth resulted in an improved model while maintaining generalizability.
 
 
 # Modeling Performance
