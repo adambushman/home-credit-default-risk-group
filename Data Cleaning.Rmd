@@ -79,12 +79,12 @@ application_cleaning <- function(data, train = TRUE) {
   # remove rows where FLAG_OWN_CAR = "Y" and OWN_CAR_AGE is NA
   if(train) {
     # ONLY DROP ROWS IF THIS IS TRAINING
-    data <- data[!(data$FLAG_OWN_CAR == "Y" & is.na(data$OWN_xCAR_AGE)), ]
+    data <- data[!(data$FLAG_OWN_CAR == "Y" & is.na(data$OWN_CAR_AGE)), ]
   } else {
     # PRESERVE ROWS & IMPUTE IF THIS IS TESTING
-    if(sum(is.na(data$OWN_xCAR_AGE)) > 0) {
-      mean_own_car_age <- median(as.integer(data$OWN_xCAR_AGE), na.rm = TRUE)
-      data$OWN_xCAR_AGE[!(data$FLAG_OWN_CAR == "Y" & is.na(data$OWN_xCAR_AGE))] <- mean_own_car_age
+    if(sum(is.na(data$OWN_CAR_AGE)) > 0) {
+      mean_own_car_age <- median(as.integer(data$OWN_CAR_AGE), na.rm = TRUE)
+      data$OWN_CAR_AGE[data$FLAG_OWN_CAR == "Y" & is.na(data$OWN_CAR_AGE)] <- mean_own_car_age
     }
   }
 
