@@ -623,9 +623,192 @@ Ultimately, attempts to tune hyperparameters and engineer more predictive relati
 
 ## Support Vector Machines
 
-```{r}
+Support Vector Machines are a logical choice for a high dimensional problem such as this. They do well to avoid overfitting and can handle high dimensions very well. 
 
+However, they are computationally intensive and are better suited for situations where the number of observations is small. It particularly is good when the count of rows exceed the count of columns. That *is not* our situation here.
+
+Still, it should provide a good alternative to tree-based and OLS type approaches.
+
+### Model Preparation
+
+Leveraging support vector machines in R using the `{e1071 }` package requires its own set of formatting requirements. Specifically, any column with a constant value must be removed. 
+
+Additionally, SVM is computationally intensive so we absolutely cannot run the model on the entire 550K data set. We'll work just just 2% of the data (around 10K records). 
+
+This is the flow for preparing the data for SVM in code format:
+
+```{r eval=FALSE}
+set.seed(2015)
+
+# Splits
+partition_idx <- createDataPartition(data$DEFAULT, p = 0.8, list = FALSE)
+full_train <- data[partition_idx,]
+full_test <- data[-partition_idx,]
+
+# 2% sample of the data
+train_sampl <- sample_n(
+    full_train, ceiling(nrow(full_train) * 0.02)
+)
+test_sampl <- sample_n(
+    full_test, ceiling(nrow(full_test) * 0.05)
+)
 ```
+
+```{r}
+unique <- sapply(train_sampl, function(x) length(unique(x)))
+remove_cols <- names(unique[unique == 1])
+
+train_sampl <- train_sampl |> select(-all_of(remove_cols))
+test_sampl <- test_sampl |> select(-all_of(remove_cols))
+```
+
+This latter code chunk dynamically removes any column that has a single, unique value (a constant). We then have a nice training and testing sample to work with.
+
+### Hyperparameter Tuning
+
+Part of fitting a support vector machine model is selecting hyperparameters. This is done with cross validation. The idea is to test a range of values and choose the combinations that best maximize the performance metric (in our case, AUC).
+
+The resources in the `{caret}` package for cross validated training were not performing correctly so we implemented it by hand:
+
+```{r eval=FALSE}
+train_folds <- rsample::vfold_cv(train_sampl)
+
+fitGrid <- expand.grid(
+    sigma = c(0.01, 0.05), 
+    C = c(0.01, 0.5, 1, 5, 10), 
+    AUC = 0
+)
+```
+
+We have 10 folds to use for cross validation. Our tuning grid uses two different values of `sigma` and five different values for `C` (cost). Together, the tuning grid is 10 unique combinations.
+
+### Fitting the model with CV
+
+Running cross validation is fairly straight forward. The theory is to do the following for each fold:
+
+1.  Get the training and testing sets for the current fold
+2.  Select the hyperparameters corresponding to the current fold
+3.  Train an SVM using the training and hyperparameters
+4.  Make predictions using the fitted SVM with testing
+5.  Calculate the AUC value from the resulting predictions
+6.  Save the AUC value to the corresponding hyperparameters used
+7.  Repeat for the next fold
+
+The code implementation of that is included below: 
+
+```{r eval=FALSE}
+runCvSVM <- function(grid, folds) {
+    for(i in 1:nrow(folds)) {
+        # Values for modeling
+        fold <- folds$splits[i][[1]]
+        sigma <- grid$sigma[i]
+        C <- grid$C[i]
+
+        # Training
+        train <- training(fold)
+        unique <- sapply(train, function(x) length(unique(x)))
+        remove_cols <- names(unique[unique == 1])
+
+        train <- train |> select(-all_of(remove_cols))
+        modl <- e1071::svm(DEFAULT ~ ., data = train, sigma = sigma, C = C)
+        
+        # Testing
+        test <- testing(fold) |> select(-all_of(remove_cols))
+        pred <- predict(modl, newdata = test, type = 'response')
+
+        # Evaluation
+        roc_obj <- roc(ifelse(test$DEFAULT == "Y", 1, 0), ifelse(pred == "Y", 1, 0))
+        auc <- auc(roc_obj)
+
+        # Save measure
+        grid$AUC[i] = auc
+        print(paste0("AUC from fold ", i, ":"))
+        print(auc)
+    }
+    return(grid)
+}
+```
+
+The results looked as follows:
+
+````
+   sigma     C       AUC
+1   0.01  0.01 0.8189310
+2   0.05  0.01 0.8369932
+3   0.01  0.50 0.8375020
+4   0.05  0.50 0.8221758
+5   0.01  1.00 0.8365004
+6   0.05  1.00 0.8245600
+7   0.01  5.00 0.8205697
+8   0.05  5.00 0.8539352
+9   0.01 10.00 0.8259827
+10  0.05 10.00 0.8229776
+````
+
+The AUC values look quite robust. 
+
+
+### Evaluating model on test data
+
+We can confirm we're achieving this level of performance by training a model on the entire training sample using the hyperparameters identified. We went with `sigma = 0.05` and `C = 5.00`:
+
+```{r eval=FALSE}
+tuned_mod <- e1071::svm(DEFAULT ~ ., data = train_sampl, sigma = 0.05, C = 5.00)
+
+pred_probs <- predict(tuned_mod, newdata = test_sampl, type = 'response')
+```
+
+With these predictions, we can calculate all the performance metrics we care about: accuracy, precision, recall, and AUC:
+
+```{r eval=FALSE}
+roc_obj <- pROC::roc(ifelse(test_sampl$DEFAULT == "Y", 1, 0), ifelse(pred_probs == "Y", 1, 0))
+
+# Calculate AUC
+auc3 <- auc(roc_obj)
+
+# Caret confusion matrix object has elements for performance
+mat3 <- confusionMatrix(
+    factor(ifelse(pred_probs == "Y", 1, 0), levels = c(1,0)), 
+    factor(ifelse(test_sampl$DEFAULT == "Y", 1, 0), levels = c(1,0))
+)
+```
+
+We then collect all of the metrics into a vector which is saved as a CSV for later use:
+
+```{r eval=FALSE}
+performance <- c(
+    c("model" = "Support Vector Machine"), 
+    c("hyperparameters" = paste(
+        paste("Sigma:", 0.1), 
+        paste("C:", 5.00), 
+        collapse = ", "
+    )), 
+    mat3$overall[c("Accuracy")], 
+    mat3$byClass[c("Precision", "Recall")], 
+    c("AUC" = auc3)
+)
+
+data.frame(as.list(performance)) |>
+    write.csv('models/support-vector-machine/model-results.csv', row.names = FALSE)
+```
+
+We can see the results of this final model reading from that CSV:
+
+```{r}
+svm_results <- read.csv('models/support-vector-machine/model-results.csv')
+t(svm_results)
+```
+
+It's a pretty solid model, particularly good with precision (avoiding the type-1 error). We'll refer back to these values when assessing all of the models together.
+
+
+### Feature Engineering
+
+No feature engineering was performed for this model. Thanks to the radial kernal and hyperparameters, we capture complex relationships pretty well already. Additionally, time and computational power didn't permit. We instead moved to benchmark all models against the majority classifier and each other across the performance metrics so far outlined.
+
+### Conclusion
+
+While not perfectly suited to the problem (given the wealth of data), a Support Vector Machine model did well to generalize the training data and avoid overfitting. The resulting performance is very commendable and should provide a good competitor to other models that should do better (such as tree-based methods). 
 
 
 ## Random Forest
