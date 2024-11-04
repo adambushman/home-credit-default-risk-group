@@ -1,0 +1,116 @@
+---
+title: "Support Vector Machines | Model Predictions"
+subtitle: "Predicting default for loan applications in `application_train.csv` with Support Vector Machine"
+author: "Adam Bushman"
+date: "2024-11-03"
+format:
+    html:
+        embed-resources: true
+execute:
+    warning: false
+---
+
+```{r}
+library(tidyr)
+library(tidyverse)
+library(data.table)
+library(caret)
+library(ranger)
+```
+
+```{r}
+# Read in data
+application_train_smote <- as.data.frame(fread("data/application_train_smote.csv"))
+application_test_clean <- as.data.frame(fread("data/application_test_clean.csv"))
+
+# Confirm not the right column 
+ncol(application_train_smote)
+ncol(application_test_clean)
+
+# Retain unique ID
+SK_ID_CURR <- application_test_clean$SK_ID_CURR 
+
+# Transform 
+application_test_clean <- application_test_clean %>%   
+  select(-SK_ID_CURR) %>%   
+  mutate(across(where(is.character), ~factor(make.names(.))), across(where(is.logical), ~factor(ifelse(.,"Y","N"))))
+
+# Create dummies
+dummy <- dummyVars("~ .", application_test_clean)
+application_test_dummy <- data.frame(predict(dummy, application_test_clean))
+
+# About the right size
+ncol(application_test_dummy)
+
+# Get common column names
+cols_to_keep <- intersect(names(application_test_dummy), names(application_train_smote))
+
+# Finalize data sets
+application_train_full <- application_train_smote |>
+  select(all_of(c(cols_to_keep, "DEFAULT"))) |>
+  mutate(DEFAULT = factor(DEFAULT, levels = c("N", "Y")))
+
+application_test_full <- application_test_dummy %>% 
+  select(all_of(c(cols_to_keep)))
+
+# Confirm sizing
+ncol(application_train_full)
+ncol(application_test_full)
+```
+
+
+# Support Vector Machine Model Predictions
+
+```{r}
+train_sampl <- application_train_full |> sample_n(10000)
+unique <- sapply(train_sampl, function(x) length(unique(x)))
+remove_cols <- names(unique[unique == 1])
+
+train_sampl <- train_sampl |> select(-all_of(remove_cols))
+test_app <- application_test_full |> select(all_of(setdiff(names(train_sampl), c("DEFAULT"))))
+```
+
+
+```{r}
+tuned_mod <- e1071::svm(
+    DEFAULT ~ ., 
+    data = train_sampl, 
+    probability = TRUE, 
+    sigma = 0.05, 
+    C = 5.00
+)
+```
+
+```{r}
+pred_probs <- predict(
+    tuned_mod, 
+    newdata = test_app, 
+    type = 'response', 
+    probability = TRUE
+)
+```
+
+```{r}
+probs <- attr(pred_probs, "probabilities")[,2]
+ID_probs <- data.frame(SK_ID_CURR, TARGET = probs)
+```
+
+
+
+# Test Data Probabilities
+```{r}
+# probabilities on test data set
+prob_test_final <- predict(rf_model_final, application_test_full, type = "response")$predictions[,2]
+
+prob_test_final <- prob_test_final %>% round(2)
+
+# combine probabilities with IDs
+ID_probs <- data.frame(SK_ID_CURR, TARGET = prob_test_final)
+```
+
+# Write Probabilities to CSV
+```{r}
+# write to CSV file
+write.csv(ID_probs, "models/final-model/credit_test_probabilities_svm.csv", row.names = FALSE)
+```
+
