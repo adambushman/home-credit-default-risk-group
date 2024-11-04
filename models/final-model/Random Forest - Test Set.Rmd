@@ -44,8 +44,12 @@ ncol(application_test_dummy)
 cols_to_keep <- intersect(names(application_test_dummy), names(application_train_smote))
 
 # Finalize data sets
-application_train_full <- application_train_smote %>% select(all_of(c(cols_to_keep, "DEFAULT")))
-application_test_full <- application_test_dummy %>% select(all_of(c(cols_to_keep)))
+application_train_full <- application_train_smote |>
+  select(all_of(c(cols_to_keep, "DEFAULT"))) |>
+  mutate(DEFAULT = factor(DEFAULT, levels = c("Y", "N")))
+
+application_test_full <- application_test_dummy %>% 
+  select(all_of(c(cols_to_keep)))
 
 # Confirm sizing
 ncol(application_train_full)
@@ -66,7 +70,7 @@ rf_model_final <- ranger(formula = DEFAULT ~ ., data = application_train_full,
 # probabilities on test data set
 prob_test_final <- predict(rf_model_final, application_test_full, type = "response")$predictions[,2]
 
-prob_test_final %>% round(2)
+prob_test_final <- prob_test_final %>% round(2)
 
 # combine probabilities with IDs
 ID_probs <- data.frame(SK_ID_CURR, TARGET = prob_test_final)

@@ -32,7 +32,7 @@ glimpse(application_train)
 This function will perform the previously described cleaning.
 
 ```{r}
-application_cleaning <- function(data) {
+application_cleaning <- function(data, train = TRUE) {
   # remove entire columns
   data <- data[, !grepl("DOCUMENT|AVG|MODE|MEDI", names(data))]
 
@@ -42,9 +42,6 @@ application_cleaning <- function(data) {
     data[is.na(data[[col]]), col] <- 0
   }
 
-  # remove XNA rows from CODE_GENDER
-  data <- data[data$CODE_GENDER != "XNA", ]
-  
   # convert numeric variables with 2 unique values to boolean
   for (col in names(data)) {
     if (is.numeric(data[[col]]) && length(unique(data[[col]])) == 2) {
@@ -80,7 +77,16 @@ application_cleaning <- function(data) {
   data[sapply(data, is.character)] <- lapply(data[sapply(data, is.character)], factor)
 
   # remove rows where FLAG_OWN_CAR = "Y" and OWN_CAR_AGE is NA
-  data <- data[!(data$FLAG_OWN_CAR == "Y" & is.na(data$OWN_CAR_AGE)), ]
+  if(train) {
+    # ONLY DROP ROWS IF THIS IS TRAINING
+    data <- data[!(data$FLAG_OWN_CAR == "Y" & is.na(data$OWN_CAR_AGE)), ]
+  } else {
+    # PRESERVE ROWS & IMPUTE IF THIS IS TESTING
+    if(sum(is.na(data$OWN_CAR_AGE)) > 0) {
+      mean_own_car_age <- median(as.integer(data$OWN_CAR_AGE), na.rm = TRUE)
+      data$OWN_CAR_AGE[data$FLAG_OWN_CAR == "Y" & is.na(data$OWN_CAR_AGE)] <- mean_own_car_age
+    }
+  }
 
   # add 1 year to all non-NA values of OWN_CAR_AGE
   data$OWN_CAR_AGE <- ifelse(!is.na(data$OWN_CAR_AGE), data$OWN_CAR_AGE + 1, data$OWN_CAR_AGE)
@@ -105,7 +111,27 @@ application_cleaning <- function(data) {
   data$EXT_SOURCE_3[is.na(data$EXT_SOURCE_3)] <- ext3_med
 
   # remove rows with any remaining NA values
-  data <- na.omit(data)
+  if(train) {
+    # ONLY DROP ROWS IF THIS IS TRAINING
+    data <- na.omit(data)
+  } else {
+    # PRESERVE ROWS IF THIS IS TESTING
+    cols <- sapply(data, function(y) sum(length(which(is.na(y)))))
+    cols_w_na <- names(cols[which(cols != 0)])
+
+    for(col in cols_w_na) {
+      col_type <- typeof(col)
+      if(col_type %in% c('logical', 'character')) {
+        uniq_vals <- table(data[,match(col, names(data))]) |> prop.table()
+        imputed_value <- sample(names(uniq_vals), 1, prob = as.vector(uniq_vals))
+      } else {
+        value <- median(data[,match(col, names(data))], na.rm = TRUE)
+        imputed_value <- ifelse(col_type == 'integer', as.integer(value), value)
+      }
+      
+      data[,match(col, names(data))] <- imputed_value
+    }
+  }
 
   return(data)
 }
@@ -115,7 +141,7 @@ We'll now apply that to each data set, both train and test:
 
 ```{r}
 application_train_clean <- application_cleaning(application_train)
-application_test_clean <- application_cleaning(application_test)
+application_test_clean <- application_cleaning(application_test, train = FALSE)
 ```
 
 We'll write these files to the "data/" directory for easy reference during modeling.
