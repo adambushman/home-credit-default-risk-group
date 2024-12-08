@@ -1,6 +1,6 @@
 ---
 title: "Group 2 Modeling Submission"
-author: "Andy Spendlove"
+author: "Andy Spendlove, Georgia Christodoulou, Adam Bushman"
 date: "2024-10-31"
 output: 
   html_document:
@@ -18,6 +18,8 @@ library(data.table)
 library(skimr)
 library(smotefamily)
 library(glmnet)
+library(ranger)
+library(prediction)
 ```
 
 
@@ -353,7 +355,10 @@ imbal_data$pred <- FALSE
 mat1 <- caret::confusionMatrix(factor(imbal_data$pred), factor(imbal_data$DEFAULT))
 
 # Calculate summary statistics
-roc_obj1 <- pROC::roc(imbal_data$DEFAULT, imbal_data$pred)
+roc_obj1 <- pROC::roc(
+  ifelse(imbal_data$DEFAULT, 1, 0), 
+  ifelse(imbal_data$pred, 1, 0)
+)
 auc_val1 <- pROC::auc(roc_obj1)
 
 # Create summarizing vector "performance1"
@@ -378,7 +383,10 @@ bal_data$pred <- "N"
 mat2 <- caret::confusionMatrix(factor(bal_data$pred), factor(bal_data$DEFAULT))
 
 # Calculate summary statistics
-roc_obj2 <- pROC::roc(bal_data$DEFAULT, bal_data$pred)
+roc_obj2 <- pROC::roc(
+  ifelse(bal_data$DEFAULT == 'Y', 1, 0), 
+  ifelse(bal_data$pred == 'Y', 1, 0)
+)
 auc_val2 <- pROC::auc(roc_obj2)
 
 # Create summarizing vector "performance2"
@@ -654,7 +662,7 @@ test_sampl <- sample_n(
 )
 ```
 
-```{r}
+```{r eval=FALSE}
 unique <- sapply(train_sampl, function(x) length(unique(x)))
 remove_cols <- names(unique[unique == 1])
 
@@ -985,28 +993,6 @@ print(paste("AUC =", round(auc_value_test1smote, 4)))
 Increasing the number of trees and depth to 800 trees, and a depth of 20, we observed an accuracy of 0.957, recall of 1.0, precision of 0.92, and an AUC 0.99. In the test set, we observed an accuracy of 0.955, recall of 1.0, precision of 0.92, and an AUC of 0.978. The AUC remained the same between the first and second model, but the accuracy and precision improved.
 
 We can see that the SMOTE balancing method was much more effective for this type of data set, showing good generalizability between both models. Additionally, increasing the number of trees and depth resulted in an improved model while maintaining generalizability.
-
-
-# Modeling Performance
-
-## Model Comparison
-
-```{r}
-
-```
-
-
-## Performance Metrics for Best Model
-
-```{r}
-
-```
-
-
-
-# Results
-
-
 
 
 
